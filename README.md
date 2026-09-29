@@ -44,12 +44,14 @@ project starting from the same blank file.
 
 | **`shapes`** | meshes from formulas rather than files — `revolve` an outline, `extrude` a cross-section along a path, or `from_surface` any ManimGL surface into the toolkit | working, 18 tests | [reference](docs/shapes/reference.md) · [notes](docs/shapes/notes.md) |
 
+| **`astro`** | planets, moons and rings that know their own radius, flattening, axial tilt and ring edges — with both Saturn shadows solved and painted in | working, 15 tests | [reference](docs/astro/reference.md) · [notes](docs/astro/notes.md) |
+
 [`docs/adding-a-helper.md`](docs/adding-a-helper.md) is the shape the next
 one should take.
 
 ```python
 import manimgl_myplugin as P
-P.helpers()        # {'obj': (...), 'shapes': (...)}
+P.helpers()        # {'obj': (...), 'shapes': (...), 'astro': (...)}
 ```
 
 ---
@@ -87,9 +89,12 @@ manimgl_myplugin/
 ├── obj/                   helper: Wavefront .obj
 │   ├── loader.py          mesh reading, repair, reshaping — no manim
 │   └── mobject.py         OBJMobject, OBJTextured, BuildMesh
-└── shapes/                helper: meshes from formulas
-    ├── build.py           revolve, extrude, from_surface
-    └── profiles.py        the small arrays they take
+├── shapes/                helper: meshes from formulas
+│   ├── build.py           revolve, extrude, from_surface
+│   └── profiles.py        the small arrays they take
+└── astro/                 helper: planets, moons, rings
+    ├── data.py            the table of measured facts
+    └── bodies.py          Body, the presets, the shadow solving
 
 docs/
 ├── adding-a-helper.md     the shape a new helper should take
@@ -97,12 +102,15 @@ docs/
 │   ├── reference.md       every parameter and method of the obj helper
 │   ├── notes.md           bugs hit, causes, dead ends, expected numbers
 │   └── guide_bn.md        the long guide, in Bengali
-└── shapes/
+├── shapes/
+│   ├── reference.md
+│   └── notes.md
+└── astro/
     ├── reference.md
     └── notes.md
 
 examples/                  runnable scenes, one folder per helper
-tests/                     test_obj.py (21) + test_shapes.py (18)
+tests/                     obj 21 + shapes 18 + astro 15 = 54 checks
 ```
 
 ---
@@ -112,6 +120,7 @@ tests/                     test_obj.py (21) + test_shapes.py (18)
 ```bash
 python tests/test_obj.py        # 21 checks, ~9 s
 python tests/test_shapes.py     # 18 checks, ~3 s
+python tests/test_astro.py      # 15 checks, ~20 s (fetches textures once)
 ```
 
 Every check corresponds to something that was once broken, so a failure
@@ -144,6 +153,11 @@ Read [`docs/adding-a-helper.md`](docs/adding-a-helper.md). In short: a
 subpackage under `manimgl_myplugin/`, a row in the table above, a
 `reference.md` and a `notes.md` under `docs/<helper>/`, examples under
 `examples/<helper>/`, and tests that would have caught the bugs you hit.
+
+## Credits
+
+Planet and ring textures from
+[Solar System Scope](https://www.solarsystemscope.com/textures/), CC BY 4.0.
 
 ## Licence
 

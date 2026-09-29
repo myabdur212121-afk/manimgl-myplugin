@@ -1,0 +1,235 @@
+"""
+Regression tests for the astro helper.
+
+The table of facts is checked against published values, and the two
+shadows against geometry that can be worked out by hand.
+
+    python tests/test_astro.py
+"""
+
+import os
+import sys
+
+import numpy as np
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from manimgl_myplugin.astro.data import BODIES, RingBand, texture_url  # noqa: E402
+
+try:
+    from manimgl_myplugin.astro import Saturn, Mars, Moon, Body, named
+    HAVE_MANIMGL = True
+except Exception:                                           # pragma: no cover
+    HAVE_MANIMGL = False
+
+
+# ---------------------------------------------------------------- facts --
+
+def test_the_table_matches_published_values():
+    saturn = BODIES["saturn"]
+    assert saturn.equatorial_radius_m == 60_268_000
+    assert abs(saturn.flattening - 0.098) < 0.002      # ~10%, and it shows
+    assert abs(saturn.axial_tilt_deg - 26.73) < 0.05
+    assert abs(BODIES["earth"].flattening - 0.003353) < 1e-5
+    assert abs(BODIES["uranus"].axial_tilt_deg - 97.77) < 0.1   # on its side
+
+
+def test_gas_giants_are_marked_as_having_no_surface():
+    for key in ("jupiter", "saturn", "uranus", "neptune"):
+        assert not BODIES[key].solid, key
+    for key in ("mercury", "venus", "earth", "moon", "mars"):
+        assert BODIES[key].solid, key
+
+
+def test_saturns_ring_edges_and_the_cassini_gap():
+    bands = {b.name: b for b in BODIES["saturn"].rings}
+    assert abs(bands["B"].outer - 1.951) < 0.01
+    assert abs(bands["A"].inner - 2.027) < 0.01
+    # the Cassini Division is a real hole, not a transparent patch
+    assert bands["A"].inner > bands["B"].outer
+    assert all(b.inner < b.outer for b in bands.values())
+
+
+def test_texture_urls():
+    assert texture_url("mars", "4k").endswith("/4k_mars.jpg")
+    assert texture_url("saturn_ring_alpha", "2k", "png").endswith(".png")
+    try:
+        texture_url("mars", "16k")
+    except ValueError:
+        return
+    raise AssertionError("an unknown quality should be refused")
+
+
+# --------------------------------------------------------------- bodies --
+
+def _skip():
+    if not HAVE_MANIMGL:
+        print("    (skipped: ManimGL not installed)")
+        return True
+    return False
+
+
+def test_a_body_is_a_globe_plus_its_rings():
+    if _skip():
+        return
+    assert len(Mars(radius=2).submobjects) == 1                 # no rings
+    assert len(Saturn(radius=2, shadows=False).submobjects) == 4  # + C, B, A
+    assert len(Saturn(radius=2, shadows=False, rings=False).submobjects) == 1
+
+
+def test_flattening_squashes_the_poles():
+    if _skip():
+        return
+    saturn = Saturn(radius=3, shadows=False, rings=False, tilt=0)
+    w, d, h = saturn.globe.get_shape()
+    assert abs(w - 6.0) < 0.05                       # equator
+    assert abs(h / w - (1 - 0.098)) < 0.01           # 10% shorter pole to pole
+    moon = Moon(radius=3, shadows=False, tilt=0)
+    assert abs(moon.globe.get_shape()[2] / 6.0 - 1) < 0.01      # near enough
+
+
+def test_rings_sit_where_the_table_says():
+    if _skip():
+        return
+    saturn = Saturn(radius=3, shadows=False, tilt=0)
+    radii = [np.linalg.norm(np.asarray(r.get_points())[:, :2], axis=1) / 3
+             for r in saturn.ring_group]
+    assert abs(min(r.min() for r in radii) - 1.239) < 0.01      # C inner
+    assert abs(max(r.max() for r in radii) - 2.269) < 0.01      # A outer
+    # nothing inside the Cassini Division
+    allr = np.concatenate(radii)
+    assert not ((allr > 1.96) & (allr < 2.02)).any()
+
+
+def test_the_rings_lie_flat_in_the_equator():
+    if _skip():
+        return
+    saturn = Saturn(radius=3, shadows=False, tilt=0)
+    for ring in saturn.ring_group:
+        assert np.abs(np.asarray(ring.get_points())[:, 2]).max() < 1e-4
+
+
+def test_axial_tilt_tips_the_rings_with_the_planet():
+    if _skip():
+        return
+    upright = Saturn(radius=3, shadows=False, tilt=0)
+    tipped = Saturn(radius=3, shadows=False, tilt=60)
+    assert np.abs(np.asarray(tipped.ring_group[0].get_points())[:, 2]).max() > 1
+    assert np.abs(np.asarray(upright.ring_group[0].get_points())[:, 2]).max() < 1e-4
+
+
+# -------------------------------------------------------------- shadows --
+
+def test_the_globe_shadows_the_rings():
+    """
+    With the light on one side, ring points directly opposite the planet
+    must come out darker than the ones beside the light.
+    """
+    if _skip():
+        return
+    light = np.array([-14.0, 0.0, 1.0])
+    lit = Saturn(radius=3, shadows=False, tilt=0)
+    shaded = Saturn(radius=3, tilt=0, light=light)
+
+    def brightness(body):
+        ring = body.ring_group[1]                    # the B ring
+        pts = np.asarray(ring.get_points())
+        rgb = np.asarray(ring.data["rgba"][:, :3])
+        far = pts[:, 0] > 2.0                        # away from the light
+        near = pts[:, 0] < -2.0                      # towards it
+        return rgb[near].mean(), rgb[far].mean()
+
+    near_lit, far_lit = brightness(lit)
+    near_sh, far_sh = brightness(shaded)
+    assert abs(near_sh - near_lit) < 0.02, "the sunward side must not change"
+    assert far_sh < far_lit * 0.5, "the far side should fall into shadow"
+
+
+def test_shadow_strength_controls_how_dark():
+    if _skip():
+        return
+    light = np.array([-14.0, 0.0, 1.0])
+    soft = Saturn(radius=3, tilt=0, light=light, shadow_strength=0.3)
+    hard = Saturn(radius=3, tilt=0, light=light, shadow_strength=1.0)
+
+    def far_side(body):
+        ring = body.ring_group[1]
+        pts = np.asarray(ring.get_points())
+        return np.asarray(ring.data["rgba"][:, :3])[pts[:, 0] > 2.0].mean()
+
+    assert far_side(hard) < far_side(soft)
+
+
+def test_the_rings_shadow_the_globe():
+    """
+    The ring shadow is painted into a copy of the texture, because a
+    ManimGL textured surface has no per-vertex colour to darken. Check the
+    globe ends up pointing at a repainted image, and that the repaint
+    really is darker.
+    """
+    if _skip():
+        return
+    from PIL import Image
+    light = np.array([-14.0, -8.0, 1.0])
+    plain = Saturn(radius=3, shadows=False, light=light)
+    shaded = Saturn(radius=3, light=light)
+
+    before = plain.globe.textures["LightTexture"].path
+    after = shaded.globe.textures["LightTexture"].path
+    assert str(after) != str(before), "the texture was not repainted"
+
+    a = np.asarray(Image.open(before).convert("L"), dtype=float)
+    b = np.asarray(Image.open(after).convert("L").resize(
+        Image.open(before).size), dtype=float)
+    ratio = b / np.maximum(a, 1)
+    assert (ratio < 0.7).mean() > 0.01, "no part of the globe was darkened"
+    assert ratio.min() < 0.4, "the shadow is too faint to see"
+
+
+def test_shadows_off_leaves_the_original_texture():
+    if _skip():
+        return
+    saturn = Saturn(radius=3, shadows=False)
+    assert "2k_saturn" in str(saturn.globe.textures["LightTexture"].path)
+
+
+# --------------------------------------------------------------- lookup --
+
+def test_named_and_quality():
+    if _skip():
+        return
+    assert isinstance(named("mars", radius=2), Body)
+    try:
+        named("pluto")
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("an unknown body should raise")
+    mars = Mars(radius=2, quality="4k")
+    assert "4k_mars" in str(mars.globe.textures["LightTexture"].path)
+
+
+def test_info_reads_sensibly():
+    if _skip():
+        return
+    text = Saturn(radius=2, shadows=False).info()
+    assert "60,268 km" in text and "C" in text and "A" in text
+
+
+def main():
+    tests = [(n, f) for n, f in sorted(globals().items())
+             if n.startswith("test_") and callable(f)]
+    failed = []
+    for name, fn in tests:
+        try:
+            fn()
+            print(f"  ok    {name}")
+        except Exception as exc:
+            print(f"  FAIL  {name}: {type(exc).__name__}: {exc}")
+            failed.append(name)
+    print(f"\n  {len(tests) - len(failed)}/{len(tests)} passed")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

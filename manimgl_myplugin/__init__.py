@@ -18,6 +18,9 @@ Helpers
     Meshes from formulas instead of files -- revolve an outline, sweep a
     cross-section along a path, or read one out of any ManimGL surface.
     See ``docs/shapes/reference.md``.
+``astro``
+    Planets, moons and rings, each knowing its own radius, flattening and
+    axial tilt. See ``docs/astro/reference.md``.
 
 Anything that touches the renderer is imported lazily, so the parts that
 are plain numpy — mesh reading and reshaping, for instance — work on a
@@ -41,6 +44,11 @@ _HELPERS: dict[str, tuple[str, ...]] = {
         "circle_profile", "square_profile", "polygon_profile",
         "star_profile", "semicircle_profile",
         "line_path", "arc_path", "helix_path",
+    ),
+    "astro": (
+        "Body", "RingBand", "BodyFacts", "BODIES", "named",
+        "Mercury", "Venus", "Earth", "Moon", "Mars",
+        "Jupiter", "Saturn", "Uranus", "Neptune",
     ),
 }
 
