@@ -45,16 +45,29 @@ from .loader import (
     MODELS_DIR,
     CACHE_DIR,
 )
-from .obj_mobject import (
-    OBJTextured,
-    OBJMobject,
-    OBJGroup,
-    BuildMesh,
-    AXIS_MATRICES,
-    DEFAULT_PALETTE,
-)
-
 __version__ = "1.6.0"
+
+#: The names that live in obj_mobject, which is the only part that needs
+#: ManimGL. They are imported on first use rather than up front, so that
+#: ``from manim_obj import load_mesh`` works on a machine with no manim at
+#: all -- the whole mesh side is plain numpy and useful on its own.
+_MOBJECT_NAMES = frozenset({
+    "OBJMobject", "OBJTextured", "OBJGroup", "BuildMesh",
+    "AXIS_MATRICES", "DEFAULT_PALETTE",
+})
+
+
+def __getattr__(name):                      # PEP 562
+    if name in _MOBJECT_NAMES:
+        from . import obj_mobject
+        value = getattr(obj_mobject, name)
+        globals()[name] = value             # only look it up once
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | _MOBJECT_NAMES)
 
 __all__ = [
     "OBJMobject",

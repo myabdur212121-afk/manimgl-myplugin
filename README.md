@@ -223,9 +223,6 @@ Being clear about this matters more than the feature list.
 - `subdivide(smooth=True)` **rounds off sharp corners.** Right for a sphere
   or a scanned figure, wrong for architecture. Use `smooth=False` there.
 - `displace()` needs vertices to move, so it must follow `subdivide()`.
-- **No automated test suite yet.** Everything here was verified by rendering
-  and looking, which is how two real bugs survived until a viewer spotted
-  them.
 - Not published to PyPI.
 
 ### Not what this is for at all
@@ -269,7 +266,13 @@ the feature limits above.
 manimgl examples/01_minimal.py Simplest -w -l -c "#070B14" --video_dir /tmp/out
 ```
 
-A longer guide, in Bengali, is at `docs/guide_bn.md`.
+```bash
+python tests/test_manim_obj.py      # 21 checks, ~9 s
+```
+
+A longer guide, in Bengali, is at `docs/guide_bn.md`. **[`NOTES.md`](./NOTES.md)**
+records every bug that came up, its cause, and the directions already known
+to be dead ends — read it before changing anything.
 
 ---
 
