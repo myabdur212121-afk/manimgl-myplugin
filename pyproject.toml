@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "manim-obj"
+version = "1.6.0"
+description = "Load Wavefront .obj models as native ManimGL mobjects"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["manim", "manimgl", "3d", "obj", "wavefront", "mesh", "animation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Multimedia :: Graphics :: 3D Rendering",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "trimesh>=4.0",
+    "Pillow>=9.0",
+    "fast-simplification>=0.1",
+]
+
+[project.optional-dependencies]
+# ManimGL is not on PyPI in a version that matches; install it from git:
+#   pip install git+https://github.com/3b1b/manim.git
+dev = ["pytest>=7.0"]
+
+[project.urls]
+Homepage = "https://github.com/myabdur212121-afk/manim-obj"
+
+[tool.setuptools.packages.find]
+include = ["manim_obj*"]

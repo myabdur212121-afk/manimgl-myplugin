@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.cache/
+.pytest_cache/
+
+# never commit credentials
+secrets/
+*.token
+.netrc
+
+# manim output
+media/
+videos/**/media/
