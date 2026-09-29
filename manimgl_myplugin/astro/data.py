@@ -46,6 +46,9 @@ class BodyFacts:
     night_texture: str | None = None
     rings: tuple[RingBand, ...] = ()
     solid: bool = True                  # False for the gas giants
+    #: Sidereal rotation period in hours. Negative means retrograde --
+    #: Venus and Uranus really do turn the other way.
+    rotation_period_h: float = 24.0
     note: str = ""
 
 
@@ -71,22 +74,31 @@ _NEPTUNE_RINGS = (RingBand(2.15, 2.16, 0.12, "Adams"),)
 
 
 BODIES: dict[str, BodyFacts] = {
-    "mercury": BodyFacts("Mercury", 2_439_700, 0.0, 0.03, "mercury"),
+    "mercury": BodyFacts("Mercury", 2_439_700, 0.0, 0.03, "mercury",
+                       rotation_period_h=1407.6),
     "venus": BodyFacts("Venus", 6_051_800, 0.0, 177.4, "venus_atmosphere",
-                       note="the cloud deck, not the surface"),
+                       note="the cloud deck, not the surface",
+                       rotation_period_h=-5832.5),
     "earth": BodyFacts("Earth", 6_378_137, 0.003353, 23.44, "earth_daymap",
-                       night_texture="earth_nightmap"),
-    "moon": BodyFacts("Moon", 1_737_400, 0.0012, 6.68, "moon"),
-    "mars": BodyFacts("Mars", 3_396_190, 0.005886, 25.19, "mars"),
+                       night_texture="earth_nightmap",
+                       rotation_period_h=23.9345),
+    "moon": BodyFacts("Moon", 1_737_400, 0.0012, 6.68, "moon",
+                       rotation_period_h=655.72),
+    "mars": BodyFacts("Mars", 3_396_190, 0.005886, 25.19, "mars",
+                       rotation_period_h=24.6229),
     "jupiter": BodyFacts("Jupiter", 71_492_000, 0.06487, 3.13, "jupiter",
-                         rings=_JUPITER_RINGS, solid=False),
+                         rings=_JUPITER_RINGS, solid=False,
+                       rotation_period_h=9.925),
     "saturn": BodyFacts("Saturn", 60_268_000, 0.09796, 26.73, "saturn",
-                        rings=_SATURN_RINGS, solid=False),
+                        rings=_SATURN_RINGS, solid=False,
+                       rotation_period_h=10.656),
     "uranus": BodyFacts("Uranus", 25_559_000, 0.02293, 97.77, "uranus",
                         rings=_URANUS_RINGS, solid=False,
-                        note="tipped on its side, so the rings stand up"),
+                        note="tipped on its side, so the rings stand up",
+                       rotation_period_h=-17.24),
     "neptune": BodyFacts("Neptune", 24_764_000, 0.01708, 28.32, "neptune",
-                         rings=_NEPTUNE_RINGS, solid=False),
+                         rings=_NEPTUNE_RINGS, solid=False,
+                       rotation_period_h=16.11),
 }
 
 

@@ -44,7 +44,7 @@ project starting from the same blank file.
 
 | **`shapes`** | meshes from formulas rather than files — `revolve` an outline, `extrude` a cross-section along a path, or `from_surface` any ManimGL surface into the toolkit | working, 18 tests | [reference](docs/shapes/reference.md) · [notes](docs/shapes/notes.md) |
 
-| **`astro`** | planets, moons and rings that know their own radius, flattening, axial tilt and ring edges — with both Saturn shadows solved and painted in | working, 15 tests | [reference](docs/astro/reference.md) · [notes](docs/astro/notes.md) |
+| **`astro`** | planets, moons and rings that know their own radius, flattening, axial tilt and ring edges — with both Saturn shadows solved and painted in | working, 21 tests | [reference](docs/astro/reference.md) · [notes](docs/astro/notes.md) |
 
 [`docs/adding-a-helper.md`](docs/adding-a-helper.md) is the shape the next
 one should take.
@@ -110,7 +110,7 @@ docs/
     └── notes.md
 
 examples/                  runnable scenes, one folder per helper
-tests/                     obj 21 + shapes 18 + astro 15 = 54 checks
+tests/                     obj 21 + shapes 18 + astro 21 = 60 checks
 ```
 
 ---
@@ -120,7 +120,7 @@ tests/                     obj 21 + shapes 18 + astro 15 = 54 checks
 ```bash
 python tests/test_obj.py        # 21 checks, ~9 s
 python tests/test_shapes.py     # 18 checks, ~3 s
-python tests/test_astro.py      # 15 checks, ~20 s (fetches textures once)
+python tests/test_astro.py      # 21 checks, ~30 s (fetches textures once)
 ```
 
 Every check corresponds to something that was once broken, so a failure

@@ -17,7 +17,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from manimgl_myplugin.astro.data import BODIES, RingBand, texture_url  # noqa: E402
 
 try:
-    from manimgl_myplugin.astro import Saturn, Mars, Moon, Body, named
+    from manimgl_myplugin.astro import (Saturn, Mars, Moon, Earth, Venus,
+                                    Jupiter, Uranus, Body, named)
     HAVE_MANIMGL = True
 except Exception:                                           # pragma: no cover
     HAVE_MANIMGL = False
@@ -191,6 +192,76 @@ def test_shadows_off_leaves_the_original_texture():
         return
     saturn = Saturn(radius=3, shadows=False)
     assert "2k_saturn" in str(saturn.globe.textures["LightTexture"].path)
+
+
+# -------------------------------------------------------------- turning --
+
+def test_axis_is_the_tilted_pole_not_the_world_z():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    tilt = np.radians(earth.tilt)
+    assert np.allclose(earth.axis, [0, -np.sin(tilt), np.cos(tilt)], atol=0.01)
+    assert abs(np.degrees(np.arccos(earth.axis @ [0, 0, 1])) - 23.44) < 0.1
+
+
+def test_spin_leaves_the_pole_alone_but_rotate_does_not():
+    """
+    The whole point of spin. Turning about the scene's z axis makes a
+    tilted planet's pole wander in a circle; turning about its own axis
+    does not.
+    """
+    if _skip():
+        return
+    spun = Earth(radius=3, shadows=False).spin(0.4)
+    before = spun.axis.copy()
+    for updater in spun.get_updaters():
+        updater(spun, 1.0)
+    assert np.allclose(spun.axis, before, atol=1e-6), "spin moved the pole"
+
+    wrong = Earth(radius=3, shadows=False)
+    wrong.rotate(0.4, np.array([0.0, 0.0, 1.0]))
+    assert not np.allclose(wrong.axis, before, atol=0.01)
+
+
+def test_spin_rate_period_and_day():
+    if _skip():
+        return
+    from manimlib.constants import TAU
+    assert abs(Earth(shadows=False).spin(0.3)._spin_rate - 0.3) < 1e-9
+    assert abs(Earth(shadows=False).spin(period=8)._spin_rate - TAU / 8) < 1e-9
+    # day= uses the real sidereal period, so Jupiter outruns Earth
+    fast = Jupiter(shadows=False).spin(day=4)._spin_rate
+    slow = Earth(shadows=False).spin(day=4)._spin_rate
+    assert fast > slow * 2
+
+
+def test_venus_and_uranus_spin_backwards():
+    if _skip():
+        return
+    assert Venus(shadows=False).spin(day=4)._spin_rate < 0
+    assert Uranus(shadows=False).spin(day=4)._spin_rate < 0
+    assert Mars(shadows=False).spin(day=4)._spin_rate > 0
+
+
+def test_stop_spin_removes_the_updater():
+    if _skip():
+        return
+    body = Mars(shadows=False).spin(0.5)
+    assert len(body.get_updaters()) == 1
+    body.stop_spin()
+    assert len(body.get_updaters()) == 0
+
+
+def test_turn_is_an_animation_about_the_bodys_own_axis():
+    if _skip():
+        return
+    from manimlib.animation.rotation import Rotating
+    earth = Earth(radius=3, shadows=False)
+    anim = earth.turn(np.pi, run_time=2)
+    assert isinstance(anim, Rotating)
+    assert np.allclose(anim.axis, earth.axis)
+    assert anim.run_time == 2
 
 
 # --------------------------------------------------------------- lookup --

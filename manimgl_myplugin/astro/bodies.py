@@ -20,7 +20,8 @@ from __future__ import annotations
 import hashlib
 import numpy as np
 
-from manimlib.constants import DEGREES, OUT, RIGHT
+from manimlib.animation.rotation import Rotating
+from manimlib.constants import DEGREES, OUT, RIGHT, TAU
 from manimlib.mobject.mobject import Group
 
 from ..obj.loader import CACHE_DIR, MODELS_DIR, fetch_model
@@ -404,6 +405,87 @@ class Body(Group):
         fresh.set_points(self.globe.get_points())
         self.replace_submobject(self.submobjects.index(self.globe), fresh)
         self.globe = fresh
+
+    # ------------------------------------------------------------ turning --
+
+    @property
+    def axis(self) -> np.ndarray:
+        """
+        The body's own pole, as a unit vector, wherever it is pointing now.
+
+        Read from the mesh rather than worked out from the tilt, so it
+        stays right after you move or rotate the body in the scene.
+        """
+        if getattr(self, "_pole_corner", None) is None:
+            mesh = self.globe.mesh
+            poles = np.argwhere(np.asarray(mesh.uvs)[:, 1] > 0.999).ravel()
+            hit = np.argwhere(np.isin(mesh.tri_vt, poles))
+            face, corner = hit[0]
+            self._pole_corner = int(face) * 3 + int(corner)
+        offset = (np.asarray(self.globe.get_points())[self._pole_corner]
+                  - self.globe.get_center())
+        length = np.linalg.norm(offset)
+        return offset / length if length > 1e-9 else np.array([0.0, 0.0, 1.0])
+
+    def spin(self, rate: float = 0.3, *, period: float | None = None,
+             day: float | None = None):
+        """
+        Keep turning on the body's own axis, for as long as it is on screen.
+
+        ::
+
+            self.add(Earth().spin(0.3))            # 0.3 radians a second
+            self.add(Mars().spin(period=8))        # one turn every 8 seconds
+            self.add(Jupiter().spin(day=4))        # one Earth day = 4 seconds
+
+        This is not the same as ``rotate``. ``rotate`` turns the body about
+        an axis of the *scene*, which for a tilted planet makes the pole
+        wander in a circle instead of the planet spinning. ``spin`` uses
+        :attr:`axis`, the body's own pole, so Earth leans 23.44 degrees and
+        turns underneath that lean, the way it actually does.
+
+        ``day`` scales every body by its real sidereal period, so Jupiter
+        visibly outruns Mars and Venus turns backwards, which it does.
+        """
+        if day is not None:
+            hours = self.facts.rotation_period_h or 24.0
+            rate = TAU / (day * abs(hours) / 24.0) * (1 if hours > 0 else -1)
+        elif period is not None:
+            rate = TAU / period
+
+        self.stop_spin()
+        self._spin_rate = rate
+
+        def turn_a_little(mob, dt):
+            mob.rotate(mob._spin_rate * dt, mob.axis,
+                       about_point=mob.get_center())
+
+        self._spin_updater = turn_a_little
+        self.add_updater(turn_a_little)
+        return self
+
+    def stop_spin(self):
+        """Take the spin off again."""
+        if getattr(self, "_spin_updater", None) is not None:
+            self.remove_updater(self._spin_updater)
+            self._spin_updater = None
+        return self
+
+    def turn(self, angle: float = TAU, **kwargs) -> Rotating:
+        """
+        One measured turn on the body's own axis, as an animation.
+
+        ::
+
+            self.play(earth.turn(PI))
+            self.play(earth.turn(TAU, run_time=4, rate_func=smooth))
+
+        Everything ``Rotating`` takes is accepted -- ``run_time``,
+        ``rate_func``, ``lag_ratio`` -- this only fills in the axis and the
+        centre so you do not have to.
+        """
+        kwargs.setdefault("about_point", self.get_center())
+        return Rotating(self, angle, axis=self.axis, **kwargs)
 
     # -------------------------------------------------------------- misc --
 

@@ -60,6 +60,8 @@ Body(
 )
 ```
 
+Plus `spin`, `stop_spin`, `turn` and the `axis` property — see *Turning*.
+
 ### `quality`
 
 Solar System Scope publishes **2k and 8k only**. Asking their server for 4k
@@ -102,6 +104,41 @@ saturn.follow_light(self, every=15)                    # track it during a scene
 
 `follow_light` updates the rings every frame and the globe every `every`
 frames, because repainting a 4k texture 30 times a second is not possible.
+
+### Turning
+
+`rotate()` is manim's own and turns the body about an axis of the **scene**.
+For a tilted planet that is almost never what you want: the pole swings
+round in a circle instead of the planet spinning underneath it.
+
+`spin()` and `turn()` use `body.axis` — the body's own pole, read from the
+mesh so it stays correct after you move or rotate the body.
+
+```python
+self.add(Earth().spin(0.3))          # radians per second, forever
+self.add(Mars().spin(period=8))      # one full turn every 8 seconds
+self.add(Jupiter().spin(day=3))      # one Earth day = 3 seconds
+
+self.play(earth.turn(PI))                                  # half a turn
+self.play(earth.turn(TAU, run_time=5, rate_func=smooth))   # with easing
+
+earth.stop_spin()
+```
+
+`day=` scales every body by its real sidereal period, so Jupiter (9.9 h)
+visibly outruns Mars (24.6 h), and Venus and Uranus turn **backwards**
+because they really do.
+
+| | period (h) | | period (h) |
+| --- | --- | --- | --- |
+| Mercury | 1407.6 | Jupiter | 9.93 |
+| Venus | **−5832.5** | Saturn | 10.66 |
+| Earth | 23.93 | Uranus | **−17.24** |
+| Moon | 655.7 | Neptune | 16.11 |
+| Mars | 24.62 | | |
+
+`turn()` returns a `Rotating`, so every animation argument works —
+`run_time`, `rate_func`, `lag_ratio`.
 
 ### `rings`
 

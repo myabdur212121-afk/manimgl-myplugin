@@ -78,6 +78,19 @@ Rings are built with `shading=(0, 0, 0)`; they scatter light rather than
 reflecting it off a surface, so no shading is the physical answer as well
 as the convenient one.
 
+### 2.6 A tilted planet that wobbled instead of spinning
+
+| | |
+| --- | --- |
+| **Symptom** | `earth.add_updater(lambda m, dt: m.rotate(0.3 * dt, OUT))` made the pole swing round in a circle rather than the planet turning under it. |
+| **Cause** | `OUT` is the *scene's* z axis. Earth's pole leans 23.44° away from it, so rotating about OUT precesses the pole instead of spinning the body. Measured: 90° about OUT moves the pole 32.7°; 90° about its own axis moves it 0.0°. |
+| **Fix** | `body.axis`, `spin()` and `turn()`. The axis is read from the pole vertex of the mesh rather than recomputed from the tilt, so it stays right after the body is moved or rotated. |
+| **Guard** | `test_spin_leaves_the_pole_alone_but_rotate_does_not` |
+
+A sphere gives no clue here: rotating it does not change its silhouette,
+and its topmost *vertex* is not its pole. The pole has to be found through
+the UVs.
+
 ### 2.6 Construction that looked 40× too slow
 
 First `Saturn()` took 42 seconds; timing each stage showed 1.1 s of work
@@ -96,6 +109,7 @@ anything.
 | **Darkening the globe's vertices for the ring shadow** | A textured surface has no vertex colour. Work in texture space. |
 | **Rebaking the globe shadow every frame** | Repainting a 4k JPEG takes about a second. `follow_light` updates the rings each frame and the globe only every *n*th. |
 | **Leaving `shading` on for the rings** | They go black from underneath. |
+| **`rotate(OUT)` to spin a tilted body** | Precesses the pole. Use `spin()`. |
 | **Expecting relief at true scale** | Olympus Mons is 0.65% of Mars' radius. Without `exaggeration` there is nothing to see. |
 
 ---
@@ -111,7 +125,7 @@ anything.
 | ring shadow bake | ~0.6 s at 1024×512, cached by light direction |
 | Saturn flattening | 0.098 — the globe really is a tenth shorter pole to pole |
 
-Tests: `python tests/test_astro.py` — 15 checks, about 20 s (the first run
+Tests: `python tests/test_astro.py` — 21 checks, about 20 s (the first run
 downloads textures).
 
 ---
