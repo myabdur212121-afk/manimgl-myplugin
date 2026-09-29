@@ -1,16 +1,16 @@
 """
-The smallest scenes worth writing -- what using manim_obj actually looks like.
+The smallest scenes worth writing -- what using manimgl_myplugin actually looks like.
 
 Render any one of them:
-    manimgl examples/01_minimal.py Simplest -w -l -c "#070B14" --video_dir /tmp/out
-    manimgl examples/01_minimal.py Coloured -w -l -c "#070B14" --video_dir /tmp/out
-    manimgl examples/01_minimal.py Textured -w -l -c "#070B14" --video_dir /tmp/out
-    manimgl examples/01_minimal.py Animated -w -l -c "#070B14" --video_dir /tmp/out
+    manimgl examples/obj/01_minimal.py Simplest -w -l -c "#070B14" --video_dir /tmp/out
+    manimgl examples/obj/01_minimal.py Coloured -w -l -c "#070B14" --video_dir /tmp/out
+    manimgl examples/obj/01_minimal.py Textured -w -l -c "#070B14" --video_dir /tmp/out
+    manimgl examples/obj/01_minimal.py Animated -w -l -c "#070B14" --video_dir /tmp/out
 """
 
 from manimlib import *
 
-from manim_obj import OBJMobject, BuildMesh
+from manimgl_myplugin import OBJMobject, BuildMesh
 
 
 class Simplest(ThreeDScene):
@@ -47,7 +47,7 @@ class Textured(ThreeDScene):
         self.camera.frame.reorient(0, 74, 0)
 
         earth = OBJMobject("earth.obj", height=4)
-        globe = earth.textured("/home/user/models/earth_texture.jpg")
+        globe = earth.textured()          # image named by the .mtl
 
         self.add(globe)
         self.wait(2)

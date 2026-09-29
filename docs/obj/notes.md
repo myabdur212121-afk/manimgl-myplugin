@@ -1,4 +1,6 @@
-# manim_obj — working notes
+> Part of [manimgl_myplugin](../../README.md).
+
+# The `obj` helper — working notes
 
 Read this before changing anything. It is the short version of everything
 that went wrong while building this, what the cause turned out to be, and
@@ -15,8 +17,8 @@ native mobjects, so a real 3D model can be dropped into an explainer scene:
 self.add(OBJMobject("chair.obj", height=4))
 ```
 
-Two files do the work. `loader.py` reads, repairs and reshapes meshes and
-imports no manim at all. `obj_mobject.py` turns a mesh into a ManimGL
+Two files do the work. `obj/loader.py` reads, repairs and reshapes meshes and
+imports no manim at all. `obj/mobject.py` turns a mesh into a ManimGL
 `Surface`, and is the only part tied to the renderer.
 
 ---
@@ -191,7 +193,7 @@ QHD with that much geometry was the ceiling — 78 MB of headroom left. For
 
 ### Tests
 
-`python tests/test_manim_obj.py` — 21 checks, about 9 seconds. The mesh-side
+`python tests/test_obj.py` — 21 checks, about 9 seconds. The mesh-side
 ones run with no manim installed at all.
 
 ---
@@ -229,7 +231,7 @@ export `.obj` or `.glb`, and bring the result here for the explanatory part.
 ## 6. If you are picking this up
 
 1. `pip install -e .` from the project folder, plus ManimGL from git.
-2. `python tests/test_manim_obj.py` — 9 seconds, tells you the library is
+2. `python tests/test_obj.py` — 9 seconds, tells you the library is
    intact before you spend 13 minutes on a render.
 3. Read §3 before trying to improve anything.
 4. Render a draft with `-l` first. It is roughly six times faster and shows

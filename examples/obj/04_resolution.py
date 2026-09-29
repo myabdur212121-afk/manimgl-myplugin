@@ -1,7 +1,7 @@
 """
 Resolution, both directions -- and the texture the file asked for.
 
-    manimgl examples/04_resolution.py Resolution -w -m \
+    manimgl examples/obj/04_resolution.py Resolution -w -m \
         -c "#070B14" --video_dir videos/08_resolution
 
 Four ideas, in order:
@@ -13,7 +13,7 @@ Four ideas, in order:
 
 from manimlib import *
 
-from manim_obj import OBJMobject, load_mesh
+from manimgl_myplugin import OBJMobject, load_mesh
 
 INK, DIM, CYAN, GOLD = "#E8EEF7", "#8095AE", "#6FE3D4", "#F2B33D"
 MONO = "DejaVu Sans Mono"

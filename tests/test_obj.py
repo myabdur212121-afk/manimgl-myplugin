@@ -1,11 +1,11 @@
 """
-Regression tests for manim_obj.
+Regression tests for manimgl_myplugin.
 
 Every number in here was measured, and every check corresponds to something
 that was once broken. If one fails, NOTES.md says what it means.
 
-    python tests/test_manim_obj.py      # no pytest needed
-    pytest tests/test_manim_obj.py -q
+    python tests/test_obj.py      # no pytest needed
+    pytest tests/test_obj.py -q
 
 The loader tests need only numpy/scipy/trimesh/Pillow. The mobject tests
 need ManimGL and skip themselves if it is not installed.
@@ -19,10 +19,10 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from manim_obj.loader import load_mesh, parse_obj          # noqa: E402
+from manimgl_myplugin.obj.loader import load_mesh, parse_obj          # noqa: E402
 
 try:
-    from manim_obj import OBJMobject, BuildMesh
+    from manimgl_myplugin import OBJMobject, BuildMesh
     HAVE_MANIMGL = True
 except Exception:                                          # pragma: no cover
     HAVE_MANIMGL = False
@@ -81,7 +81,7 @@ def test_other_formats_through_trimesh():
 
 def test_the_mesh_side_works_without_manim():
     """
-    `from manim_obj import load_mesh` must not drag ManimGL in. The mesh
+    `from manimgl_myplugin import load_mesh` must not drag ManimGL in. The mesh
     half is plain numpy and is useful on its own, so obj_mobject is
     imported lazily (PEP 562) rather than at package import.
     """
@@ -95,7 +95,7 @@ class Block(MetaPathFinder):
             raise ImportError('manimlib not installed (simulated)')
 sys.meta_path.insert(0, Block())
 sys.path.insert(0, %r)
-from manim_obj import load_mesh
+from manimgl_myplugin import load_mesh
 print(load_mesh('earth.obj').subdivide(1).decimate(4000).num_faces)
 """ % os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
     out = subprocess.run([sys.executable, "-c", probe],

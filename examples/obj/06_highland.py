@@ -15,14 +15,14 @@ is smoothed out of a blocky collision mesh, and the globe carries real
 displaced relief.
 
 Render (QHD):
-    manimgl examples/06_highland.py Highland -w -r 2560x1440 \
+    manimgl examples/obj/06_highland.py Highland -w -r 2560x1440 \
         -c "#05070E" --video_dir videos/10_highland
 """
 
 import numpy as np
 from manimlib import *
 
-from manim_obj import OBJMobject, BuildMesh
+from manimgl_myplugin import OBJMobject, BuildMesh
 
 INK, DIM, CYAN, GOLD = "#EAF0F8", "#7E93AC", "#6FE3D4", "#F2B33D"
 MONO = "DejaVu Sans Mono"
@@ -303,7 +303,7 @@ class Highland(ThreeDScene):
 
         # ---- outro --------------------------------------------------------------------
         outro = VGroup(
-            Text("manim_obj", font_size=46, color=INK),
+            Text("manimgl_myplugin", font_size=46, color=INK),
             Text("eight files · none of them touched by hand",
                  font=MONO, font_size=21, color=GOLD),
         ).arrange(DOWN, buff=0.28).fix_in_frame().to_edge(DOWN, buff=0.55)

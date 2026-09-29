@@ -1,5 +1,5 @@
 """
-manim_obj.obj_mobject
+manimgl_myplugin.obj.mobject
 =====================
 
 ``OBJMobject`` -- a Wavefront .obj model as a first-class ManimGL mobject.
@@ -73,7 +73,7 @@ class OBJMobject(Surface):
     -----------
     ::
 
-        from manim_obj import OBJMobject
+        from manimgl_myplugin import OBJMobject
 
         model = OBJMobject("building.obj", height=4, up_axis="z")
         self.add(model)
@@ -207,7 +207,7 @@ class OBJMobject(Surface):
             rule = "rare" if dedupe in (True, "auto") else dedupe
             mesh, removed = mesh.dedupe_coincident(rule, report=True)
             if removed and dedupe == "auto":
-                print(f"[manim_obj] dropped {removed} coincident duplicate "
+                print(f"[manimgl_myplugin] dropped {removed} coincident duplicate "
                       f"faces (z-fighting); pass dedupe=False to keep them")
 
         # Coarsen first, then refine, then push the relief out: each step

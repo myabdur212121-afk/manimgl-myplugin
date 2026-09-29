@@ -6,14 +6,14 @@ the first building in Israel raised on pilotis. Downloaded from the
 ladybug-tools/3d-models collection by tools/get_building.py.
 
 Render:
-    manimgl examples/02_building.py BuildingDemo -w -m \
+    manimgl examples/obj/02_building.py BuildingDemo -w -m \
         -c "#070B14" --video_dir videos/05_obj
 """
 
 import numpy as np
 from manimlib import *
 
-from manim_obj import OBJMobject, BuildMesh
+from manimgl_myplugin import OBJMobject, BuildMesh
 
 # ----------------------------------------------------------------- palette --
 INK = "#E8EEF7"

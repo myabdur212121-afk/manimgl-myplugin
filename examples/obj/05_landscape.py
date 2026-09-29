@@ -1,5 +1,5 @@
 """
-The full tour -- one landscape, every part of manim_obj working at once.
+The full tour -- one landscape, every part of manimgl_myplugin working at once.
 
 Models, all straight off the internet, four different exporters:
     terrain.obj   ericstoneking/42          3,042   Z-up
@@ -19,14 +19,14 @@ What this exercises:
     the scene       a camera that flies, and a light source that moves
 
 Render:
-    manimgl examples/05_landscape.py Landscape -w -m \
+    manimgl examples/obj/05_landscape.py Landscape -w -m \
         -c "#05080F" --video_dir videos/09_landscape
 """
 
 import numpy as np
 from manimlib import *
 
-from manim_obj import OBJMobject, BuildMesh, load_mesh
+from manimgl_myplugin import OBJMobject, BuildMesh, load_mesh
 
 INK, DIM, CYAN, GOLD = "#E8EEF7", "#7E93AC", "#6FE3D4", "#F2B33D"
 MONO = "DejaVu Sans Mono"
@@ -89,7 +89,7 @@ class Landscape(ThreeDScene):
 
         frame.reorient(-28, 88, 0, (0, 0, 0.4), 11.0)
 
-        title = Text("manim_obj", font_size=58, color=INK)
+        title = Text("manimgl_myplugin", font_size=58, color=INK)
         sub = Text("six models · one scene", font=MONO, font_size=23, color=GOLD)
         card = VGroup(title, sub).arrange(DOWN, buff=0.28).fix_in_frame()
         self.play(Write(title), run_time=1.2)
@@ -241,7 +241,7 @@ class Landscape(ThreeDScene):
 
         # ---- outro ------------------------------------------------------------
         outro = VGroup(
-            Text("manim_obj", font_size=42, color=INK),
+            Text("manimgl_myplugin", font_size=42, color=INK),
             Text("load · colour · texture · reshape · animate",
                  font=MONO, font_size=20, color=GOLD),
         ).arrange(DOWN, buff=0.26).fix_in_frame().to_edge(DOWN, buff=0.55)

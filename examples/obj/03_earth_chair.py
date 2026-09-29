@@ -8,13 +8,13 @@ Neither was cleaned up or converted first. Both are Y-up, which is the OBJ
 convention and the library's default, so neither needs an `up_axis`.
 
 Render:
-    manimgl examples/03_earth_chair.py EarthAndChair -w -m \
+    manimgl examples/obj/03_earth_chair.py EarthAndChair -w -m \
         -c "#070B14" --video_dir videos/06_earth_chair
 """
 
 from manimlib import *
 
-from manim_obj import OBJMobject, BuildMesh
+from manimgl_myplugin import OBJMobject, BuildMesh
 
 INK, DIM, CYAN, GOLD = "#E8EEF7", "#8095AE", "#6FE3D4", "#F2B33D"
 MONO = "DejaVu Sans Mono"

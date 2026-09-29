@@ -1,5 +1,5 @@
 """
-manim_obj.loader
+manimgl_myplugin.obj.loader
 ================
 
 Wavefront OBJ / MTL loading, downloading and caching.
@@ -1070,15 +1070,15 @@ def fetch_model(url: str, name: str | None = None, *,
 
     if path.exists() and not force:
         if not quiet:
-            print(f"[manim_obj] cached  {path}  ({path.stat().st_size:,} bytes)")
+            print(f"[manimgl_myplugin] cached  {path}  ({path.stat().st_size:,} bytes)")
     else:
         if not quiet:
-            print(f"[manim_obj] fetching {url}")
-        req = urllib.request.Request(url, headers={"User-Agent": "manim_obj/1.0"})
+            print(f"[manimgl_myplugin] fetching {url}")
+        req = urllib.request.Request(url, headers={"User-Agent": "manimgl_myplugin/0.1"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             path.write_bytes(r.read())
         if not quiet:
-            print(f"[manim_obj] saved    {path}  ({path.stat().st_size:,} bytes)")
+            print(f"[manimgl_myplugin] saved    {path}  ({path.stat().st_size:,} bytes)")
 
     if companions and path.suffix.lower() == ".obj":
         for lib in _mtllibs_of(path):
@@ -1088,11 +1088,11 @@ def fetch_model(url: str, name: str | None = None, *,
             try:
                 mtl_url = url.rsplit("/", 1)[0] + "/" + lib
                 req = urllib.request.Request(mtl_url,
-                                             headers={"User-Agent": "manim_obj/1.0"})
+                                             headers={"User-Agent": "manimgl_myplugin/0.1"})
                 with urllib.request.urlopen(req, timeout=timeout) as r:
                     side.write_bytes(r.read())
                 if not quiet:
-                    print(f"[manim_obj] saved    {side} (material library)")
+                    print(f"[manimgl_myplugin] saved    {side} (material library)")
             except Exception:
                 pass  # a missing .mtl is not fatal, colours just fall back
     return path

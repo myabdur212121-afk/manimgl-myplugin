@@ -1,11 +1,11 @@
 """
-manim_obj -- Wavefront .obj models in ManimGL
+manimgl_myplugin.obj -- Wavefront .obj models in ManimGL
 =============================================
 
 ::
 
     from manimlib import *
-    from manim_obj import OBJMobject
+    from manimgl_myplugin import OBJMobject
 
     class Demo(ThreeDScene):
         def construct(self):
@@ -49,7 +49,7 @@ __version__ = "1.6.0"
 
 #: The names that live in obj_mobject, which is the only part that needs
 #: ManimGL. They are imported on first use rather than up front, so that
-#: ``from manim_obj import load_mesh`` works on a machine with no manim at
+#: ``from manimgl_myplugin import load_mesh`` works on a machine with no manim at
 #: all -- the whole mesh side is plain numpy and useful on its own.
 _MOBJECT_NAMES = frozenset({
     "OBJMobject", "OBJTextured", "OBJGroup", "BuildMesh",
@@ -59,7 +59,7 @@ _MOBJECT_NAMES = frozenset({
 
 def __getattr__(name):                      # PEP 562
     if name in _MOBJECT_NAMES:
-        from . import obj_mobject
+        from . import mobject as obj_mobject
         value = getattr(obj_mobject, name)
         globals()[name] = value             # only look it up once
         return value

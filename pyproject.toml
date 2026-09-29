@@ -3,9 +3,9 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "manim-obj"
-version = "1.6.0"
-description = "Load Wavefront .obj models as native ManimGL mobjects"
+name = "manimgl-myplugin"
+version = "0.1.0"
+description = "Helpers for ManimGL — Wavefront .obj models as native mobjects, and more to come"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -30,7 +30,7 @@ dependencies = [
 dev = ["pytest>=7.0"]
 
 [project.urls]
-Homepage = "https://github.com/myabdur212121-afk/manim-obj"
+Homepage = "https://github.com/myabdur212121-afk/manimgl-myplugin"
 
 [tool.setuptools.packages.find]
-include = ["manim_obj*"]
+include = ["manimgl_myplugin*"]

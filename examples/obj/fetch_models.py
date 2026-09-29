@@ -20,8 +20,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from manim_obj import load_mesh
-from manim_obj.loader import MODELS_DIR, fetch_model
+from manimgl_myplugin import load_mesh
+from manimgl_myplugin.obj.loader import MODELS_DIR, fetch_model
 
 BASE = "https://raw.githubusercontent.com/ladybug-tools/3d-models/master/obj"
 
