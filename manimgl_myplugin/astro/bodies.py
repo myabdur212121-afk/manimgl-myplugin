@@ -22,7 +22,10 @@ import numpy as np
 
 from manimlib.animation.rotation import Rotating
 from manimlib.constants import DEGREES, OUT, RIGHT, TAU
+from manimlib.mobject.geometry import Line
 from manimlib.mobject.mobject import Group
+from manimlib.mobject.types.dot_cloud import DotCloud
+from manimlib.mobject.types.vectorized_mobject import VGroup, VMobject
 
 from ..obj.loader import CACHE_DIR, MODELS_DIR, fetch_model
 from ..obj.mobject import OBJMobject
@@ -34,6 +37,10 @@ __all__ = ["Body", "RingBand", "Mercury", "Venus", "Earth", "Moon", "Mars",
 
 #: ManimGL's own default light position, so a body looks right with no setup.
 DEFAULT_LIGHT = np.array([-10.0, 10.0, 10.0])
+
+#: Markers and guide lines default to this, so they read against
+#: both a blue planet and a red one.
+GOLD_MARKER = "#F2B33D"
 
 #: How far out the Solar System Scope ring strip reaches, in planet radii.
 #: The image covers the whole system from the inner D ring to the outer A.
@@ -405,6 +412,161 @@ class Body(Group):
         fresh.set_points(self.globe.get_points())
         self.replace_submobject(self.submobjects.index(self.globe), fresh)
         self.globe = fresh
+
+    # ----------------------------------------------------------- geography --
+
+    def point_at(self, lat: float, lon: float, height: float = 0.0):
+        """
+        Where a latitude and longitude land, in scene coordinates.
+
+        ::
+
+            dhaka = earth.point_at(23.8, 90.4)
+
+        Degrees, north and east positive, the way an atlas gives them, and
+        lined up with the texture -- ``point_at(23, 13)`` really is in the
+        Sahara.
+        ``height`` lifts the point off the surface as a fraction of the
+        radius, which is what you want for a marker that should not sink
+        into the ground.
+
+        Follows the body: tilt it or move it and the answer moves with it.
+        """
+        # The texture's left edge is longitude -180 and revolve starts its
+        # sweep on +x, so the map is half a turn round from the maths.
+        # Without this, asking for the Sahara hands you the Pacific.
+        a, o = np.radians(lat), np.radians(lon + 180.0)
+        r = self.radius * (1.0 + height)
+        local = np.array([r * np.cos(a) * np.cos(o),
+                          r * np.cos(a) * np.sin(o),
+                          r * self._polar_scale() * np.sin(a)])
+        if self.tilt:
+            t = self.tilt * DEGREES
+            c, s = np.cos(t), np.sin(t)
+            local = np.array([local[0],
+                              c * local[1] - s * local[2],
+                              s * local[1] + c * local[2]])
+        return self.get_center() + local
+
+    def marker(self, lat: float, lon: float, color=GOLD_MARKER,
+               size: float = 0.05, height: float = 0.01) -> DotCloud:
+        """
+        A dot pinned to a place on the surface.
+
+        ::
+
+            self.add(earth.marker(23.8, 90.4))          # Dhaka
+
+        Lifted very slightly off the ground by default, or the depth test
+        leaves it half buried in the texture.
+        """
+        dot = DotCloud([self.point_at(lat, lon, height)])
+        dot.set_color(color)
+        dot.set_radius(size * self.radius / 3.0)
+        return dot
+
+    def arc_between(self, start, end, height: float = 0.22,
+                    samples: int = 80, **kwargs) -> VMobject:
+        """
+        The short way round between two places, lifted into an arc.
+
+        ::
+
+            self.add(earth.arc_between((23.8, 90.4), (51.5, -0.1)))
+
+        Each point is a great-circle step pushed out by a sine bump, so the
+        line leaves and lands flat and rises in the middle -- a flight path
+        rather than a chord through the planet.
+        """
+        p0 = self.point_at(*start) - self.get_center()
+        p1 = self.point_at(*end) - self.get_center()
+        n0, n1 = p0 / np.linalg.norm(p0), p1 / np.linalg.norm(p1)
+        omega = np.arccos(np.clip(n0 @ n1, -1, 1))
+        t = np.linspace(0, 1, samples)
+
+        if omega < 1e-6:
+            path = np.outer(np.ones_like(t), n0)
+        else:                                   # spherical interpolation
+            path = (np.outer(np.sin((1 - t) * omega), n0)
+                    + np.outer(np.sin(t * omega), n1)) / np.sin(omega)
+
+        lift = self.radius * (1 + height * np.sin(np.pi * t))
+        arc = VMobject().set_points_smoothly(
+            self.get_center() + path * lift[:, None])
+        arc.set_stroke(kwargs.pop("color", GOLD_MARKER),
+                       kwargs.pop("width", 2.0), **kwargs)
+        return arc
+
+    def graticule(self, step: int = 30, color="#8FE8FF", width: float = 1.6,
+                  height: float = 0.004) -> VGroup:
+        """
+        The lat/lon grid, for when the geometry needs explaining.
+
+        ``step`` is the spacing in degrees. Lines sit a hair above the
+        surface so they are not eaten by the depth test.
+        """
+        lines = VGroup()
+        for lat in range(-90 + step, 90, step):
+            pts = [self.point_at(lat, lon, height) for lon in range(0, 361, 5)]
+            lines.add(VMobject().set_points_smoothly(np.array(pts)))
+        for lon in range(0, 360, step):
+            pts = [self.point_at(lat, lon, height) for lat in range(-90, 91, 5)]
+            lines.add(VMobject().set_points_smoothly(np.array(pts)))
+        lines.set_stroke(color, width)
+        return lines
+
+    def axis_line(self, overhang: float = 1.4, color=GOLD_MARKER,
+                  width: float = 0.03) -> Line:
+        """
+        The pole, drawn -- the quickest way to see whether a spin is right.
+        """
+        arm = self.axis * self.radius * overhang
+        centre = self.get_center()
+        line = Line(centre - arm, centre + arm)
+        line.set_stroke(color, width * 100)
+        return line
+
+    # ------------------------------------------------------------- motion --
+
+    def orbit(self, around, radius: float, period: float = 12.0,
+              tilt: float = 0.0, phase: float = 0.0):
+        """
+        Circle another body, keeping on spinning if it already was.
+
+        ::
+
+            self.add(earth.spin(0.4))
+            self.add(moon.orbit(earth, radius=6, period=10))
+
+        ``radius`` is in scene units from the centre of ``around``,
+        ``period`` the seconds for one lap, ``tilt`` the degrees the orbit
+        is inclined, ``phase`` where on the circle it starts.
+        """
+        self.stop_orbit()
+        state = {"angle": float(phase)}
+        incline = tilt * DEGREES
+
+        def step(mob, dt):
+            state["angle"] += TAU * dt / period
+            a = state["angle"]
+            offset = np.array([radius * np.cos(a), radius * np.sin(a), 0.0])
+            if incline:
+                c, s = np.cos(incline), np.sin(incline)
+                offset = np.array([offset[0],
+                                   c * offset[1] - s * offset[2],
+                                   s * offset[1] + c * offset[2]])
+            mob.shift(around.get_center() + offset - mob.get_center())
+
+        self._orbit_updater = step
+        self.add_updater(step)
+        return self
+
+    def stop_orbit(self):
+        """Stop circling, stay where it is."""
+        if getattr(self, "_orbit_updater", None) is not None:
+            self.remove_updater(self._orbit_updater)
+            self._orbit_updater = None
+        return self
 
     # ------------------------------------------------------------ turning --
 

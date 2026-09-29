@@ -140,6 +140,33 @@ because they really do.
 `turn()` returns a `Rotating`, so every animation argument works —
 `run_time`, `rate_func`, `lag_ratio`.
 
+### Geography and motion
+
+Everything here follows the body: tilt it, move it, spin it, and the
+answers move too.
+
+```python
+earth.point_at(23.8, 90.4)                        # Dhaka, in scene coords
+earth.point_at(23.8, 90.4, height=0.1)            # lifted off the surface
+earth.marker(23.8, 90.4, color=GOLD, size=0.07)   # a dot pinned to a place
+earth.arc_between((23.8, 90.4), (51.5, -0.1))     # great-circle flight path
+earth.graticule(step=30)                          # the lat/lon grid
+earth.axis_line()                                 # the pole, drawn
+
+moon.orbit(earth, radius=5.2, period=9, tilt=12)
+moon.stop_orbit()
+```
+
+Latitude and longitude are degrees, north and east positive, **lined up
+with the texture** — `point_at(23, 13)` really is in the Sahara. That
+needed a half-turn correction: the texture's left edge is longitude −180
+while `revolve` starts its sweep on +x, and without it the Sahara came
+out in the middle of the Pacific. There is a test that samples the map
+and checks land is land.
+
+`orbit` and `spin` compose — a moon can circle a planet while turning on
+its own axis.
+
 ### `rings`
 
 ```python

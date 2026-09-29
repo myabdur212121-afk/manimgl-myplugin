@@ -264,6 +264,117 @@ def test_turn_is_an_animation_about_the_bodys_own_axis():
     assert anim.run_time == 2
 
 
+# ------------------------------------------------------------ geography --
+
+def test_point_at_lands_on_the_surface_and_follows_the_tilt():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    for lat, lon in [(0, 0), (23.8, 90.4), (-45, 170), (51.5, -0.1)]:
+        r = np.linalg.norm(earth.point_at(lat, lon) - earth.get_center())
+        assert abs(r - 3) < 0.05, (lat, lon, r)
+    # the north pole must be the spin axis, or geography and rotation disagree
+    pole = earth.point_at(90, 0) - earth.get_center()
+    assert np.allclose(pole / np.linalg.norm(pole), earth.axis, atol=0.01)
+
+
+def test_point_at_agrees_with_the_texture():
+    """
+    The map was half a turn out at first: asking for the Sahara handed
+    back the middle of the Pacific. Sample the texture where each place
+    should be and check land is land.
+    """
+    if _skip():
+        return
+    from PIL import Image
+    earth = Earth(radius=3, shadows=False, tilt=0)
+    img = np.asarray(Image.open(
+        earth.globe.textures["LightTexture"].path).convert("RGB"))
+    h, w = img.shape[:2]
+
+    def is_sea(lat, lon):
+        point = earth.point_at(lat, lon) - earth.get_center()
+        turn = (np.degrees(np.arctan2(point[1], point[0])) % 360) / 360
+        u, v = turn, (lat + 90) / 180
+        r, g, b = map(int, img[int((1 - v) * (h - 1)), int(u * (w - 1))])
+        return b > r + 20
+
+    assert not is_sea(23, 13), "the Sahara came out wet"
+    assert not is_sea(21, 79), "India came out wet"
+    assert not is_sea(23.8, 90.4), "Dhaka came out wet"
+    assert is_sea(0, -150), "the Pacific came out dry"
+    assert is_sea(0, -30), "the Atlantic came out dry"
+
+
+def test_point_at_moves_with_the_body():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    before = earth.point_at(0, 0)
+    earth.shift(np.array([2.0, 0.0, 0.0]))
+    assert np.allclose(earth.point_at(0, 0), before + [2, 0, 0], atol=1e-6)
+
+
+def test_height_lifts_a_marker_clear_of_the_surface():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    low = np.linalg.norm(earth.point_at(0, 0, 0.0) - earth.get_center())
+    high = np.linalg.norm(earth.point_at(0, 0, 0.1) - earth.get_center())
+    assert abs(high / low - 1.1) < 0.01
+
+
+def test_arc_between_leaves_the_surface_and_comes_back():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1), height=0.25)
+    r = np.linalg.norm(np.asarray(arc.get_points()) - earth.get_center(), axis=1)
+    assert abs(r[0] - 3) < 0.15 and abs(r[-1] - 3) < 0.15   # flat at both ends
+    assert r.max() > 3.4                                     # and up in between
+
+
+def test_graticule_and_axis_line_exist_and_sit_on_the_body():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    grid = earth.graticule(30)
+    assert len(grid) == 17                      # 5 parallels + 12 meridians
+    pts = np.concatenate([np.asarray(m.get_points()) for m in grid])
+    r = np.linalg.norm(pts - earth.get_center(), axis=1)
+    assert 2.9 < r.min() and r.max() < 3.2
+
+    line = earth.axis_line()
+    ends = np.asarray(line.get_points())
+    direction = ends[-1] - ends[0]
+    assert np.allclose(direction / np.linalg.norm(direction), earth.axis, atol=0.02)
+
+
+def test_orbit_keeps_its_distance_and_comes_back_round():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    moon = Moon(radius=1, shadows=False).orbit(earth, radius=6, period=10)
+    seen = []
+    for _ in range(40):
+        for u in moon.get_updaters():
+            u(moon, 0.25)
+        seen.append(np.linalg.norm(moon.get_center() - earth.get_center()))
+    assert max(abs(d - 6) for d in seen) < 1e-6      # a circle, not a spiral
+    assert np.allclose(moon.get_center(), earth.get_center() + [6, 0, 0], atol=1e-6)
+
+    moon.stop_orbit()
+    assert len(moon.get_updaters()) == 0
+
+
+def test_orbit_and_spin_work_together():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    moon = Moon(radius=1, shadows=False).spin(0.5).orbit(earth, radius=5)
+    assert len(moon.get_updaters()) == 2
+
+
 # --------------------------------------------------------------- lookup --
 
 def test_named_and_quality():

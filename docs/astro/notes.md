@@ -97,6 +97,18 @@ First `Saturn()` took 42 seconds; timing each stage showed 1.1 s of work
 and the rest was downloading textures. Time the parts before optimising
 anything.
 
+### 2.7 The Sahara came out in the Pacific
+
+| | |
+| --- | --- |
+| **Symptom** | Markers placed by latitude and longitude landed nowhere near the right country, though they sat correctly on the surface. |
+| **Cause** | An equirectangular texture starts at longitude −180 on its left edge; `revolve` starts its sweep on the +x axis. The map is therefore half a turn round from the maths, and `point_at` was using the maths. |
+| **Fix** | `point_at` adds 180° to the longitude before building the vector. |
+| **Guard** | `test_point_at_agrees_with_the_texture` — samples the real texture at five named places and checks land is land. |
+
+Nothing about the render looked wrong; the dots sat neatly on the globe.
+Only naming a place and checking the colour underneath caught it.
+
 ---
 
 ## 3. Directions that do not work
@@ -110,6 +122,7 @@ anything.
 | **Rebaking the globe shadow every frame** | Repainting a 4k JPEG takes about a second. `follow_light` updates the rings each frame and the globe only every *n*th. |
 | **Leaving `shading` on for the rings** | They go black from underneath. |
 | **`rotate(OUT)` to spin a tilted body** | Precesses the pole. Use `spin()`. |
+| **Trusting lat/lon without checking the map** | The texture is half a turn round from the maths. Sample it. |
 | **Expecting relief at true scale** | Olympus Mons is 0.65% of Mars' radius. Without `exaggeration` there is nothing to see. |
 
 ---
@@ -125,7 +138,7 @@ anything.
 | ring shadow bake | ~0.6 s at 1024×512, cached by light direction |
 | Saturn flattening | 0.098 — the globe really is a tenth shorter pole to pole |
 
-Tests: `python tests/test_astro.py` — 21 checks, about 20 s (the first run
+Tests: `python tests/test_astro.py` — 29 checks, about 20 s (the first run
 downloads textures).
 
 ---
