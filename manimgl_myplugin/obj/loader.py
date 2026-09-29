@@ -745,6 +745,35 @@ class MeshData:
                         + self.vertex_normals() * offset[:, None]).astype(np.float32)
         return out
 
+    def weld(self, tol: float = 1e-5) -> "MeshData":
+        """
+        Fuse vertices that sit on top of each other.
+
+        ::
+
+            mesh = mesh.weld()          # 24 corners of a cube -> 8
+
+        Surfaces that were built separately and then put in one mesh still
+        carry two copies of every shared corner. The result looks closed but
+        is not connected: :meth:`subdivide` reads each patch as having a free
+        edge and curls it away from its neighbours, and normals break along
+        the join. Rounding coordinates onto a grid of size ``tol`` and
+        keeping one vertex per cell puts the surface back together.
+
+        Only positions are merged. UVs are left alone, which is what you
+        want -- two patches meeting at an edge often need different texture
+        coordinates there.
+        """
+        cells = np.round(np.asarray(self.vertices, dtype=np.float64) / tol)
+        _, keep, inverse = np.unique(cells.astype(np.int64), axis=0,
+                                     return_index=True, return_inverse=True)
+        if len(keep) == len(self.vertices):
+            return self
+        out = self.copy()
+        out.vertices = np.asarray(self.vertices)[keep].astype(np.float32)
+        out.tri_v = np.asarray(inverse)[self.tri_v].astype(np.int32)
+        return out
+
     def decimate(self, target, *, transfer: bool = True) -> "MeshData":
         """
         Fewer triangles, as close to the same shape as possible.

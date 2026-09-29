@@ -42,12 +42,14 @@ project starting from the same blank file.
 | --- | --- | --- | --- |
 | **`obj`** | Wavefront `.obj` models as native mobjects — loading, axis conversion, materials, per-pixel texturing, decimate / subdivide / displace, wireframes, point clouds, build-up animation | working, 21 tests | [reference](docs/obj/reference.md) · [notes](docs/obj/notes.md) · [guide (বাংলা)](docs/obj/guide_bn.md) |
 
-Nothing else is written yet. [`docs/adding-a-helper.md`](docs/adding-a-helper.md)
-is the shape the next one should take.
+| **`shapes`** | meshes from formulas rather than files — `revolve` an outline, `extrude` a cross-section along a path, or `from_surface` any ManimGL surface into the toolkit | working, 18 tests | [reference](docs/shapes/reference.md) · [notes](docs/shapes/notes.md) |
+
+[`docs/adding-a-helper.md`](docs/adding-a-helper.md) is the shape the next
+one should take.
 
 ```python
 import manimgl_myplugin as P
-P.helpers()        # {'obj': (...the names it exports...)}
+P.helpers()        # {'obj': (...), 'shapes': (...)}
 ```
 
 ---
@@ -82,19 +84,25 @@ mesh = load_mesh("earth.obj").subdivide(2).decimate(20_000)
 ```
 manimgl_myplugin/
 ├── __init__.py            re-exports every helper's public names
-└── obj/                   helper: Wavefront .obj
-    ├── loader.py          mesh reading, repair, reshaping — no manim
-    └── mobject.py         OBJMobject, OBJTextured, BuildMesh
+├── obj/                   helper: Wavefront .obj
+│   ├── loader.py          mesh reading, repair, reshaping — no manim
+│   └── mobject.py         OBJMobject, OBJTextured, BuildMesh
+└── shapes/                helper: meshes from formulas
+    ├── build.py           revolve, extrude, from_surface
+    └── profiles.py        the small arrays they take
 
 docs/
 ├── adding-a-helper.md     the shape a new helper should take
-└── obj/
-    ├── reference.md       every parameter and method of the obj helper
-    ├── notes.md           bugs hit, causes, dead ends, expected numbers
-    └── guide_bn.md        the long guide, in Bengali
+├── obj/
+│   ├── reference.md       every parameter and method of the obj helper
+│   ├── notes.md           bugs hit, causes, dead ends, expected numbers
+│   └── guide_bn.md        the long guide, in Bengali
+└── shapes/
+    ├── reference.md
+    └── notes.md
 
 examples/                  runnable scenes, one folder per helper
-tests/                     python tests/test_obj.py  →  21 checks, ~9 s
+tests/                     test_obj.py (21) + test_shapes.py (18)
 ```
 
 ---
@@ -102,7 +110,8 @@ tests/                     python tests/test_obj.py  →  21 checks, ~9 s
 ## Running the tests
 
 ```bash
-python tests/test_obj.py        # ~9 seconds
+python tests/test_obj.py        # 21 checks, ~9 s
+python tests/test_shapes.py     # 18 checks, ~3 s
 ```
 
 Every check corresponds to something that was once broken, so a failure

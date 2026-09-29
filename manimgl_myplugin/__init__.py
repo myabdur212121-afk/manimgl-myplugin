@@ -14,6 +14,10 @@ Helpers
     conversion, materials, real texture mapping, decimate / subdivide /
     displace, wireframes, point clouds, and a build-up animation.
     See ``docs/obj/reference.md``.
+``shapes``
+    Meshes from formulas instead of files -- revolve an outline, sweep a
+    cross-section along a path, or read one out of any ManimGL surface.
+    See ``docs/shapes/reference.md``.
 
 Anything that touches the renderer is imported lazily, so the parts that
 are plain numpy — mesh reading and reshaping, for instance — work on a
@@ -31,6 +35,12 @@ _HELPERS: dict[str, tuple[str, ...]] = {
         "MeshData", "Material",
         "load_mesh", "parse_obj", "parse_mtl", "fetch_model",
         "MODELS_DIR", "CACHE_DIR", "AXIS_MATRICES", "DEFAULT_PALETTE",
+    ),
+    "shapes": (
+        "revolve", "extrude", "from_surface",
+        "circle_profile", "square_profile", "polygon_profile",
+        "star_profile", "semicircle_profile",
+        "line_path", "arc_path", "helix_path",
     ),
 }
 
