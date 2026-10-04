@@ -18,11 +18,13 @@ tilt, which texture, where the rings start and stop. See ``data.py``.
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
+
 import numpy as np
 
 from manimlib.animation.rotation import Rotating
 from manimlib.constants import DEGREES, OUT, RIGHT, TAU
-from manimlib.mobject.geometry import Line
+from manimlib.mobject.geometry import Arc, Line
 from manimlib.mobject.mobject import Group
 from manimlib.mobject.types.dot_cloud import DotCloud
 from manimlib.mobject.types.vectorized_mobject import VGroup, VMobject
@@ -103,6 +105,9 @@ class Body(Group):
     """
 
     facts: BodyFacts | None = None
+    # class-level sentinel: None while __init__ is ingesting the globe and
+    # rings, a list once construction is done and tracking may begin
+    _overlays: list | None = None
 
     def __init__(
         self,
@@ -148,7 +153,11 @@ class Body(Group):
         self.globe = self._build_globe(resolution, dem, exaggeration)
         self.ring_group = Group(*[self._build_band(b) for b in self.bands])
 
+        # Group.__init__ ingests its arguments through self.add, so the
+        # globe and rings would land in _overlays if the list existed
+        # yet; it is created just after, once construction is done
         super().__init__(self.globe, *self.ring_group, **kwargs)
+        self._overlays = []
 
         if shadows and self.bands:
             self.bake_shadows(self._light)
@@ -157,7 +166,50 @@ class Body(Group):
         if self.tilt:
             self.rotate(self.tilt * DEGREES, RIGHT)
 
+    def add(self, *mobjects):
+        """Graft mobjects in; remember them as overlays for shed_overlays."""
+        if self._overlays is not None:
+            self._overlays.extend(mobjects)
+        return super().add(*mobjects)
+
+    def remove(self, *mobjects):
+        if self._overlays is not None:
+            self._overlays = [m for m in self._overlays
+                              if m not in mobjects]
+        return super().remove(*mobjects)
+
+    def shed_overlays(self):
+        """
+        Take every overlay back off: markers, arcs, labels, anchors,
+        decals -- anything grafted in after construction. The body is
+        exactly what it was built as, and ``point_at`` answers are
+        untouched either way.
+
+        ::
+
+            earth.marker(23.8, 90.4)
+            earth.shed_overlays()          # the dot and its anchor go
+        """
+        if self._overlays:
+            super().remove(*self._overlays)
+            self._overlays.clear()
+        return self
+
     # ------------------------------------------------------------ pieces --
+
+    def get_center(self) -> np.ndarray:
+        """
+        The *globe's* centre, not the family bounding box's. Grafting a
+        marker, an arc or a label on one side must never shift where the
+        body thinks it is -- otherwise point_at, spin and orbit all start
+        to wander as overlays come and go. Measured against the bounding
+        box before the fix: adding one arc moved the centre by 5% of the
+        radius.
+        """
+        globe = getattr(self, "globe", None)
+        if globe is not None and globe.has_points():
+            return globe.get_center()
+        return super().get_center()
 
     def _polar_scale(self) -> float:
         return 1.0 - self._flattening
@@ -432,24 +484,35 @@ class Body(Group):
 
         Follows the body: tilt it or move it and the answer moves with it.
         """
+        return self._points_at([lat], [lon], [height])[0]
+
+    def _points_at(self, lats, lons, heights):
+        """
+        Vectorised :meth:`point_at` -- arrays in, ``(N, 3)`` scene points
+        out. Same maths, one source of truth.
+        """
         # The texture's left edge is longitude -180 and revolve starts its
         # sweep on +x, so the map is half a turn round from the maths.
-        # Without this, asking for the Sahara hands you the Pacific.
-        a, o = np.radians(lat), np.radians(lon + 180.0)
-        r = self.radius * (1.0 + height)
-        local = np.array([r * np.cos(a) * np.cos(o),
-                          r * np.cos(a) * np.sin(o),
-                          r * self._polar_scale() * np.sin(a)])
+        # Without the +180, asking for the Sahara hands you the Pacific.
+        a = np.radians(np.asarray(lats, dtype=float))
+        o = np.radians(np.asarray(lons, dtype=float) + 180.0)
+        r = self.radius * (1.0 + np.asarray(heights, dtype=float))
+        pts = np.stack([
+            r * np.cos(a) * np.cos(o),
+            r * np.cos(a) * np.sin(o),
+            r * self._polar_scale() * np.sin(a),
+        ], axis=-1)
         if self.tilt:
             t = self.tilt * DEGREES
             c, s = np.cos(t), np.sin(t)
-            local = np.array([local[0],
-                              c * local[1] - s * local[2],
-                              s * local[1] + c * local[2]])
-        return self.get_center() + local
+            pts = np.stack([pts[:, 0],
+                            c * pts[:, 1] - s * pts[:, 2],
+                            s * pts[:, 1] + c * pts[:, 2]], axis=-1)
+        return self.get_center() + pts
 
     def marker(self, lat: float, lon: float, color=GOLD_MARKER,
-               size: float = 0.05, height: float = 0.01) -> DotCloud:
+               size: float = 0.05, height: float = 0.01,
+               follow: bool = True, **kwargs) -> DotCloud:
         """
         A dot pinned to a place on the surface.
 
@@ -459,14 +522,22 @@ class Body(Group):
 
         Lifted very slightly off the ground by default, or the depth test
         leaves it half buried in the texture.
+
+        ``follow`` (the default) grafts the dot into the body, so shifting,
+        rotating, :meth:`spin` or :meth:`orbit` all carry it along at no
+        per-frame cost. ``**kwargs`` reach the ``DotCloud`` -- ``radius``,
+        ``glow_factor``, ``opacity`` and friends.
         """
-        dot = DotCloud([self.point_at(lat, lon, height)])
+        dot = DotCloud([self.point_at(lat, lon, height)],
+                       radius=size * self.radius / 3.0, **kwargs)
         dot.set_color(color)
-        dot.set_radius(size * self.radius / 3.0)
+        if follow:
+            self.add(dot)
         return dot
 
     def arc_between(self, start, end, height: float = 0.22,
-                    samples: int = 80, **kwargs) -> VMobject:
+                    samples: int = 80, follow: bool = True,
+                    **kwargs) -> VMobject:
         """
         The short way round between two places, lifted into an arc.
 
@@ -477,6 +548,11 @@ class Body(Group):
         Each point is a great-circle step pushed out by a sine bump, so the
         line leaves and lands flat and rises in the middle -- a flight path
         rather than a chord through the planet.
+
+        ``follow`` (the default) grafts the arc into the body so it rides
+        along with every shift, rotate, spin and orbit. ``color`` and
+        ``width`` name the two common stroke settings; anything else in
+        ``**kwargs`` reaches ``set_stroke``.
         """
         p0 = self.point_at(*start) - self.get_center()
         p1 = self.point_at(*end) - self.get_center()
@@ -495,25 +571,184 @@ class Body(Group):
             self.get_center() + path * lift[:, None])
         arc.set_stroke(kwargs.pop("color", GOLD_MARKER),
                        kwargs.pop("width", 2.0), **kwargs)
+        if follow:
+            self.add(arc)
         return arc
 
-    def graticule(self, step: int = 30, color="#8FE8FF", width: float = 1.6,
-                  height: float = 0.004) -> VGroup:
+    def graticule(self, step=30, *, lat_step=None, lon_step=None,
+                  color="#8FE8FF", width: float = 1.6, height: float = 0.004,
+                  highlight=("equator",), highlight_color=None,
+                  labels: bool = False, label_font_size: int = 20,
+                  label_lon: float = 25.0, follow: bool = True,
+                  **kwargs) -> VGroup:
         """
         The lat/lon grid, for when the geometry needs explaining.
 
-        ``step`` is the spacing in degrees. Lines sit a hair above the
-        surface so they are not eaten by the depth test.
+        ::
+
+            self.play(ShowCreation(earth.graticule(30)))
+
+        ``step`` is the spacing in degrees; give ``(lat_step, lon_step)``
+        to space parallels and meridians differently. ``highlight`` names
+        the special circles to draw in ``highlight_color`` -- any of
+        ``"equator"``, ``"tropics"`` and ``"poles"`` (the polar circles);
+        ``highlight=True`` takes all three, and a single string works
+        too. A named circle is drawn even when the step would miss it --
+        no round step lands on 23.44 degrees.
+        each at the body's *own* axial tilt. ``labels=True`` tags every
+        parallel with its latitude. Lines sit a hair above the surface so
+        the depth test does not eat them, ``follow`` grafts them into the
+        body like :meth:`marker`, and ``**kwargs`` reach ``set_stroke``.
         """
+        if isinstance(step, (tuple, list)):
+            lat_step, lon_step = step
+        lat_step = float(lat_step if lat_step else step)
+        lon_step = float(lon_step if lon_step else step)
+        if highlight is True:
+            highlight = ("equator", "tropics", "poles")
+        if isinstance(highlight, str):
+            highlight = (highlight,)
+        highlight = {str(h).lower() for h in (highlight or ())}
+        highlight_color = highlight_color or GOLD_MARKER
+
+        special = {}
+        if "equator" in highlight:
+            special[0.0] = True
+        t = abs(self.tilt)
+        if "tropics" in highlight and t > 1e-6:
+            special[t] = True
+            special[-t] = True
+        if "poles" in highlight and 90.0 - t > 1e-6:
+            special[90.0 - t] = True
+            special[-(90.0 - t)] = True
+
+        def is_special(lat: float) -> bool:
+            return any(abs(lat - k) < 1e-6 for k in special)
+
         lines = VGroup()
-        for lat in range(-90 + step, 90, step):
-            pts = [self.point_at(lat, lon, height) for lon in range(0, 361, 5)]
-            lines.add(VMobject().set_points_smoothly(np.array(pts)))
-        for lon in range(0, 360, step):
-            pts = [self.point_at(lat, lon, height) for lat in range(-90, 91, 5)]
-            lines.add(VMobject().set_points_smoothly(np.array(pts)))
-        lines.set_stroke(color, width)
-        return lines
+        drawn = []
+
+        def add_parallel(lat: float):
+            lat = round(float(lat), 6)
+            drawn.append(lat)
+            lines.add(self.latitude_line(
+                lat, height=height, follow=False,
+                color=highlight_color if is_special(lat) else color,
+                width=width * 1.4 if is_special(lat) else width, **kwargs))
+
+        for lat in np.arange(-90.0 + lat_step, 90.0, lat_step):
+            add_parallel(float(lat))
+        # a named circle must appear even when the step would miss it --
+        # the tropics are at 23.44 degrees, which no round step hits
+        for k in special:
+            if not any(abs(k - p) < 1e-6 for p in drawn):
+                add_parallel(k)
+        for lon in np.arange(-180.0, 180.0, lon_step):
+            lats = np.linspace(-90.0, 90.0, 121)
+            line = VMobject().set_points_smoothly(self._points_at(
+                lats, np.full_like(lats, round(float(lon), 6)),
+                np.full_like(lats, height)))
+            line.set_stroke(color, width, **kwargs)
+            lines.add(line)
+
+        out = VGroup(*lines)
+        if labels:
+            for lat in drawn:
+                out.add(self._pinned_text(
+                    _lat_tag(lat, label_font_size,
+                             highlight_color if is_special(lat) else color),
+                    lat, label_lon, height=0.06, follow=follow))
+        if follow:
+            self.add(*lines)
+        return out
+
+    def latitude_line(self, lat: float, *, color="#8FE8FF", width: float = 1.6,
+                      height: float = 0.004, samples: int = 181,
+                      follow: bool = True, **kwargs) -> VMobject:
+        """
+        One circle of latitude, drawn on the surface and riding along with
+        the body. ``**kwargs`` reach ``set_stroke``.
+        """
+        lons = np.linspace(-180.0, 180.0, samples)
+        pts = self._points_at(np.full_like(lons, float(lat)), lons,
+                              np.full_like(lons, height))
+        line = VMobject().set_points_smoothly(pts)
+        line.set_stroke(color, width, **kwargs)
+        if follow:
+            self.add(line)
+        return line
+
+    def equator(self, **kwargs) -> VMobject:
+        """Latitude zero, highlighted by default."""
+        kwargs.setdefault("color", GOLD_MARKER)
+        kwargs.setdefault("width", 2.2)
+        return self.latitude_line(0.0, **kwargs)
+
+    def tropics(self, **kwargs) -> VGroup:
+        """
+        The two circles where the sun stands straight overhead at a
+        solstice -- at the body's own axial tilt, 23.44 degrees for Earth.
+        A body with no tilt has no tropics, so its equator stands in.
+        """
+        kwargs.setdefault("color", "#F2B33D")
+        t = abs(self.tilt)
+        if t < 1e-6:
+            return VGroup(self.equator(**kwargs))
+        return VGroup(self.latitude_line(t, **kwargs),
+                      self.latitude_line(-t, **kwargs))
+
+    def polar_circles(self, **kwargs) -> VGroup:
+        """
+        The solstice twilight circles, at ±(90° − tilt). Same rule as
+        :meth:`tropics`: an untilted body has none, so its equator stands
+        in.
+        """
+        kwargs.setdefault("color", "#7E93AC")
+        t = abs(self.tilt)
+        if 90.0 - t < 1e-6:
+            return VGroup(self.equator(**kwargs))
+        return VGroup(self.latitude_line(90.0 - t, **kwargs),
+                      self.latitude_line(-(90.0 - t), **kwargs))
+
+    def terminator(self, light=None, *, color="#8FE8FF", width: float = 1.8,
+                   samples: int = 192, follow: bool = True,
+                   **kwargs) -> VMobject:
+        """
+        The day-night line: the great circle whose points see the light on
+        their horizon.
+
+        ::
+
+            self.play(ShowCreation(earth.terminator()))
+
+        Exact for a sphere, and as close as the flattening allows for the
+        rest -- a guide line, not an ephemeris. ``light`` is a scene-space
+        position, defaulting to the one the shadows were baked with.
+        """
+        light = self._light if light is None else np.asarray(light, dtype=float)
+        d = light - self.get_center()
+        d = d / max(np.linalg.norm(d), 1e-9)
+        d = self._to_local(d)              # undo the tilt, as the shadows do
+
+        helper = np.eye(3)[int(np.argmin(np.abs(d)))]
+        e1 = helper - d * (helper @ d)
+        e1 = e1 / max(np.linalg.norm(e1), 1e-12)
+        e2 = np.cross(d, e1)
+        th = np.linspace(0, TAU, samples, endpoint=False)
+        circle = self.radius * (np.outer(np.cos(th), e1) + np.outer(np.sin(th), e2))
+        circle[:, 2] *= self._polar_scale()
+
+        if self.tilt:                      # back out of the local frame
+            t = self.tilt * DEGREES
+            c, s = np.cos(t), np.sin(t)
+            circle = np.stack([circle[:, 0],
+                               c * circle[:, 1] - s * circle[:, 2],
+                               s * circle[:, 1] + c * circle[:, 2]], axis=-1)
+        line = VMobject().set_points_smoothly(self.get_center() + circle)
+        line.set_stroke(color, width, **kwargs)
+        if follow:
+            self.add(line)
+        return line
 
     def axis_line(self, overhang: float = 1.4, color=GOLD_MARKER,
                   width: float = 0.03) -> Line:
@@ -525,6 +760,253 @@ class Body(Group):
         line = Line(centre - arm, centre + arm)
         line.set_stroke(color, width * 100)
         return line
+
+    # ------------------------------------------------- pinned overlays --
+
+    def _pinned_text(self, mob, lat: float, lon: float, *,
+                     height: float = 0.02, buff: float = 0.0,
+                     follow: bool = True):
+        """
+        Keep a text mobject readable at a surface point: its *position*
+        tracks the body through every shift, spin and orbit, while the text
+        itself keeps facing out of the surface rather than tumbling with
+        it. An invisible anchor rides inside the body; an updater rebuilds
+        the text's points around the anchor each frame -- a handful of
+        numpy, nothing more.
+        """
+        # Text and friends keep their points on the glyph submobjects, so
+        # capture each family member's points around the whole mob's centre
+        fam = [sm for sm in mob.get_family() if sm.has_points()]
+        if not fam:
+            raise ValueError("_pinned_text needs a mobject with points")
+        base = [np.asarray(sm.get_points()) - mob.get_center() for sm in fam]
+        anchor = DotCloud([self.point_at(lat, lon, height)], opacity=0.0)
+        if follow:
+            self.add(anchor)
+
+        def stay_pinned(m, dt):
+            p = np.asarray(anchor.get_points())[0]
+            n = p - self.get_center()
+            length = np.linalg.norm(n)
+            n = n / length if length > 1e-9 else np.array([0.0, 0.0, 1.0])
+            # upright on the tangent plane: as close to the scene's z as
+            # the plane allows, so text never ends up on its side
+            up = np.array([0.0, 0.0, 1.0]) - n * n[2]
+            if np.linalg.norm(up) < 1e-6:            # straight over the pole
+                up = np.array([0.0, 1.0, 0.0])
+            else:
+                up = up / np.linalg.norm(up)
+            right = np.cross(up, n)
+            rot = np.stack([right, up, n], axis=1)
+            for sm, b in zip(fam, base):
+                sm.set_points(b @ rot + p + n * buff)
+
+        stay_pinned(mob, 0.0)
+        if follow:
+            mob.add_updater(stay_pinned)
+        return mob
+
+    def label(self, lat: float, lon: float, text: str, *,
+              height: float = 0.10, buff: float = 0.02, font: str | None = None,
+              follow: bool = True, **kwargs):
+        """
+        A piece of text pinned to a place, staying readable while the body
+        moves or turns.
+
+        ::
+
+            lbl = earth.label(23.8, 90.4, "Dhaka")
+            self.add(earth, lbl)
+            self.play(Write(lbl))
+
+        The text is *not* grafted into the body -- it would tumble with the
+        spin. Instead an invisible anchor rides along inside and an updater
+        holds the text at that point, always facing out of the surface, so
+        it reads from wherever the anchor is visible.
+
+        ``**kwargs`` go straight to ManimGL's ``Text`` -- ``font_size``,
+        ``color``, ``weight`` and friends -- so the label is as adjustable
+        as any text you would write by hand.
+        """
+        from manimlib.mobject.svg.text_mobject import Text
+        if font is None:
+            mob = Text(text, **kwargs)
+        else:
+            mob = Text(text, font=font, **kwargs)
+        return self._pinned_text(mob, lat, lon, height=height, buff=buff,
+                                 follow=follow)
+
+    def place_on_surface(self, mob, lat: float, lon: float, *,
+                         height: float = 0.015, scale: float = 1.0,
+                         follow: bool = True):
+        """
+        Lay a flat mobject onto the surface at ``(lat, lon)``, bending it
+        round the curvature as it goes.
+
+        ::
+
+            tag = Text("DHAKA", font_size=24, color=YELLOW)
+            earth.place_on_surface(tag, 23.8, 90.4)
+
+        The mobject's own plane is read as the tangent plane at that point:
+        its x becomes east, its y north, and every point -- handles
+        included -- is mapped onto the globe. Short for the tangent plane
+        the result is a faithful decal; stretch it too far and the map
+        projection distortion shows, as it does on a real globe.
+
+        ``follow`` grafts the result into the body, so a decal rides along
+        with every shift, spin and orbit -- painted on, in effect.
+        """
+        # Text and friends keep their points on the glyphs, not on the
+        # group, so the map runs over every family member that has any
+        fam = [sm for sm in mob.get_family() if sm.has_points()]
+        if not fam:
+            raise ValueError("place_on_surface needs a mobject with points")
+        centre = np.concatenate([sm.get_points() for sm in fam]).mean(axis=0)
+        r = self.radius
+        for sm in fam:
+            pts = np.asarray(sm.get_points(), dtype=float)
+            local = (pts - centre) * scale
+            # one unit of tangent length is this many degrees of angle;
+            # clamp the east-west term near the poles, where it blows up
+            coslat = max(np.cos(np.radians(lat)), 0.25)
+            lats = lat + local[:, 1] / r * (180.0 / np.pi)
+            lons = lon + local[:, 0] / (r * coslat) * (180.0 / np.pi)
+            hs = height + local[:, 2] / r
+            sm.set_points(self._points_at(lats, lons, hs))
+        if follow:
+            self.add(mob)
+        return mob
+
+    def surface_text(self, text: str, lat: float, lon: float, *,
+                     height: float = 0.015, scale: float = 1.0,
+                     follow: bool = True, font: str | None = None, **kwargs):
+        """
+        Text painted onto the surface, curving with it -- the convenience
+        form of :meth:`place_on_surface`.
+
+        ::
+
+            self.add(earth.surface_text("DHAKA", 23.8, 90.4, font_size=30))
+
+        ``**kwargs`` go to ManimGL's ``Text``.
+        """
+        from manimlib.mobject.svg.text_mobject import Text
+        if font is None:
+            mob = Text(text, **kwargs)
+        else:
+            mob = Text(text, font=font, **kwargs)
+        return self.place_on_surface(mob, lat, lon, height=height,
+                                     scale=scale, follow=follow)
+
+    def cell_note(self, lat: float, lon: float, index: int = 0, *,
+                  step: float = 30, arc_radius: float = 0.10,
+                  color=GOLD_MARKER, coords: bool = True,
+                  follow: bool = True, **kwargs) -> VGroup:
+        """
+        Name and ring one corner of the graticule cell a place falls in.
+
+        ::
+
+            note = earth.cell_note(23.8, 90.4, index=2, step=30)
+            self.play(Write(note[0]), ShowCreation(note[1]))
+
+        ``index`` picks among the cell's four corners -- 0 south-west,
+        1 south-east, 2 north-east, 3 north-west -- and what comes back is
+        ``VGroup(Tex label, small arc)`` ready for ``self.play``. The Tex
+        names the corner (``P_2``) and, unless ``coords=False``, quotes its
+        own latitude and longitude. ``**kwargs`` reach the ``Tex``.
+        """
+        from manimlib.mobject.svg.tex_mobject import Tex
+
+        step = float(step)
+        lat0 = np.floor(lat / step) * step
+        lon0 = np.floor((lon + 180.0) / step) * step - 180.0
+        corners = [(lat0, lon0), (lat0, lon0 + step),
+                   (lat0 + step, lon0 + step), (lat0 + step, lon0)]
+        i = int(index) % 4
+        clat, clon = corners[i]
+
+        # ^{\circ}, not \degree: the stock manimgl preamble defines no
+        # \degree, and a failed Tex compile is a hard error
+        where = (rf"\,({clat:.0f}^{{\circ}},\,{clon:.0f}^{{\circ}})"
+                 if coords else "")
+        tag = Tex(rf"P_{{{i}}}" + where, **kwargs)
+
+        # a three-quarter ring in the tangent plane at the corner, facing
+        # out of the surface
+        p = self.point_at(clat, clon, 0.02)
+        n = p - self.get_center()
+        n = n / max(np.linalg.norm(n), 1e-9)
+        up = np.array([0.0, 0.0, 1.0]) - n * n[2]
+        up = up / max(np.linalg.norm(up), 1e-9)
+        right = np.cross(up, n)
+        ring = Arc(start_angle=-70 * DEGREES, angle=320 * DEGREES,
+                   radius=arc_radius * self.radius / 3.0)
+        ring.set_points(np.asarray(ring.get_points())
+                        @ np.stack([right, up, n], axis=1) + p)
+        ring.set_stroke(color, 2.0)
+
+        self._pinned_text(tag, clat, clon, height=0.02,
+                          buff=arc_radius * self.radius / 1.2, follow=follow)
+        return VGroup(tag, ring)
+
+    def flat_map(self, height: float | None = None, *, graticule: bool = False,
+                 night: bool = False, step: float = 30,
+                 grid_color="#8FE8FF", grid_width: float = 1.2,
+                 copy_texture: bool = True, **kwargs) -> Group:
+        """
+        The body's own map, flat: the equirectangular rectangle the globe
+        was wrapped from, at its natural 2:1.
+
+        ::
+
+            earth = Earth(radius=2)
+            self.add(earth, earth.flat_map(height=3)
+                            .next_to(earth, RIGHT, buff=1))
+
+        ``graticule=True`` rules the lat/lon grid over it. ``night=True``
+        unwraps the night map instead of the day one. ``copy_texture`` (the
+        default) works from a copy in the cache so later painting can never
+        touch the downloaded original; pass ``False`` to read the original
+        file directly. ``**kwargs`` reach ``ImageMobject`` -- ``opacity``
+        and friends. A flat map does not follow the body; move it with the
+        usual mobject methods.
+        """
+        import shutil
+        from manimlib.mobject.types.image_mobject import ImageMobject
+
+        stem = self._night_stem if night else self._texture_stem
+        if stem is None:
+            raise ValueError(f"{self.facts.name} carries no texture, "
+                             "so there is no map to unwrap")
+        source = Path(self._fetch_texture(stem))
+        if copy_texture:
+            dest = CACHE_DIR / f"flatmap-{source.name}"
+            if not dest.exists() or source.stat().st_mtime > dest.stat().st_mtime:
+                CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                shutil.copy(source, dest)
+            source = dest
+
+        if height is None:
+            height = np.pi * self.radius / 2      # half the equator's true length
+        img = ImageMobject(str(source), height=height, **kwargs)
+        # a plain Group: ImageMobject is no VMobject, so VGroup would refuse it
+        group = Group(img)
+
+        if graticule:
+            w, h = img.get_width(), img.get_height()
+            grid = VGroup()
+            for lat in np.arange(-90.0 + step, 90.0, step):
+                y = lat / 180.0 * h
+                grid.add(Line([-w / 2, y, 0], [w / 2, y, 0]))
+            for lon in np.arange(-180.0 + step, 180.0, step):
+                x = lon / 180.0 * w
+                grid.add(Line([x, -h / 2, 0], [x, h / 2, 0]))
+            grid.set_stroke(grid_color, grid_width)
+            grid.shift(0.01 * OUT)      # a hair off the image quad, or they fight
+            group.add(grid)
+        return group
 
     # ------------------------------------------------------------- motion --
 
@@ -655,11 +1137,38 @@ class Body(Group):
         f = self.facts
         rings = (", ".join(f"{b.name} {b.inner:.2f}-{b.outer:.2f}"
                            for b in self.bands) or "none")
-        return (f"{f.name}: r = {f.equatorial_radius_m / 1000:,.0f} km, "
-                f"flattening {f.flattening:.4f}, tilt {self.tilt:.1f}deg\n"
-                f"  mesh   : {self.globe.num_faces:,} triangles, "
-                f"{self.quality} texture\n"
-                f"  rings  : {rings}")
+        extra = []
+        if f.mass_kg is not None:
+            extra.append(f"mass {f.mass_kg:.3g} kg")
+        if f.surface_gravity_m_s2 is not None:
+            extra.append(f"gravity {f.surface_gravity_m_s2} m/s2")
+        if f.semi_major_axis_m is not None:
+            extra.append(f"orbit {f.semi_major_axis_m / 1e9:,.2f} Gm")
+        if f.orbital_period_days is not None:
+            extra.append(f"year {f.orbital_period_days:,.2f} d")
+        if f.mean_temp_c is not None:
+            extra.append(f"mean {f.mean_temp_c} C")
+        if f.moon_count is not None:
+            extra.append(f"moons {f.moon_count}")
+        lines = [
+            f"{f.name}: r = {f.equatorial_radius_m / 1000:,.0f} km, "
+            f"flattening {f.flattening:.4f}, tilt {self.tilt:.1f}deg",
+            f"  mesh   : {self.globe.num_faces:,} triangles, "
+            f"{self.quality} texture",
+            f"  rings  : {rings}",
+        ]
+        if extra:
+            lines.append("  facts  : " + ", ".join(extra))
+        if f.note:
+            lines.append(f"  note   : {f.note}")
+        return "\n".join(lines)
+
+
+def _lat_tag(lat: float, font_size: int, color) -> "Text":
+    """The little value tag ``graticule(labels=True)`` pins to a parallel."""
+    from manimlib.mobject.svg.text_mobject import Text
+    return Text(f"{round(lat)}\N{DEGREE SIGN}", font_size=font_size,
+                color=color)
 
 
 def _preset(key: str) -> type:

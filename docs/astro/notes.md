@@ -91,13 +91,13 @@ A sphere gives no clue here: rotating it does not change its silhouette,
 and its topmost *vertex* is not its pole. The pole has to be found through
 the UVs.
 
-### 2.6 Construction that looked 40× too slow
+### 2.7 Construction that looked 40× too slow
 
 First `Saturn()` took 42 seconds; timing each stage showed 1.1 s of work
 and the rest was downloading textures. Time the parts before optimising
 anything.
 
-### 2.7 The Sahara came out in the Pacific
+### 2.8 The Sahara came out in the Pacific
 
 | | |
 | --- | --- |
@@ -108,6 +108,43 @@ anything.
 
 Nothing about the render looked wrong; the dots sat neatly on the globe.
 Only naming a place and checking the colour underneath caught it.
+
+### 2.9 An overlay that moved the body underneath it
+
+| | |
+| --- | --- |
+| **Symptom** | After adding an arc, a marker's height above the surface read 2.819 instead of 3.000, and `point_at` answers drifted the more you added. |
+| **Cause** | `Mobject.get_center()` is the bounding-box centre of the whole family. Grafting an asymmetric overlay — one arc, one marker, one label anchor — into the `Group` moved that centre, and every lat/lon computation is measured from it. |
+| **Fix** | `Body.get_center()` now returns the globe's centre, with a `has_points()` guard and a fallback to `super()`. Overlays must never move where the body thinks it is. |
+| **Guard** | `test_an_overlay_does_not_move_the_body` — centre and one `point_at` reading, before and after grafting an arc and a marker. |
+
+The arc maths was exact; the ruler had moved. Isolating the arc from the
+body proved that before anything else got touched.
+
+### 2.10 Pinned text that never pinned
+
+| | |
+| --- | --- |
+| **Symptom** | A `label()` stood where it was born and never tracked the body — yet the tests passed, because they only counted updaters. |
+| **Cause** | manimgl's `Text` is a `VMobject` whose glyph outlines live on **submobjects**; the parent's own `get_points()` is empty. `_pinned_text` captured that empty array, so every re-pin was a `set_points` of nothing — a silent no-op. |
+| **Fix** | Capture and re-set the points per family member (every submobject that `has_points()`), about the whole mob's centre. `place_on_surface` had the same disease and the same cure. |
+| **Guard** | `test_a_label_stays_pinned_and_readable` now checks the position and the facing for real — and `test_surface_text_curves_onto_the_globe` checks every painted point sits on the shell. |
+
+The lesson generalises: in manimgl, never trust `get_points()` on a
+mobject you did not build point-by-point. `get_all_points()` is the
+family-aware reader; tests should use it too.
+
+### 2.11 A `Tex` that would not compile on a clean machine
+
+| | |
+| --- | --- |
+| **Symptom** | `cell_note` died with `LatexError: Missing } inserted` from a formula that looked fine, after an earlier `dsfont.sty not found`. |
+| **Cause** | Two layers. The stock manimgl preamble loads `dsfont`, `tipa` and `physics` but Debian's default texlive pull installs none of them; and no package in that preamble defines `\degree`, so the `P₂ (30°, 120°)` formula was doomed even once the preamble loaded. |
+| **Fix** | Write the degrees as `^{\circ}` — the manim idiom — and give the sandbox dsfont/tipa stand-in stubs plus `texlive-science` for physics. |
+| **Guard** | `test_cell_note_names_the_right_corner` — and it skips its Tex half with a note if the latex toolchain is absent. |
+
+A failed `Tex` compile is a hard error, not a fallback: worth remembering
+when a scene suddenly dies on a machine that rendered fine yesterday.
 
 ---
 
@@ -124,6 +161,11 @@ Only naming a place and checking the colour underneath caught it.
 | **`rotate(OUT)` to spin a tilted body** | Precesses the pole. Use `spin()`. |
 | **Trusting lat/lon without checking the map** | The texture is half a turn round from the maths. Sample it. |
 | **Expecting relief at true scale** | Olympus Mons is 0.65% of Mars' radius. Without `exaggeration` there is nothing to see. |
+| **`VGroup` around an `ImageMobject`** | `flat_map` tried it; VGroup refuses non-VMobjects. Plain `Group`. |
+| **Reading `get_points()` off a `Text`** | Empty — the glyphs hold the points. See 2.10. |
+| **`\degree` in a `Tex`** | Nothing in the stock preamble defines it. `^{\circ}`. |
+| **A camera-facing label** | A mobject does not know where the camera is. The label is an upright billboard on the tangent plane; that is the honest limit. |
+| **`np.arange(-180 + step, 180, step)` for meridians** | Drops the ±180 column — 16 lines at step 30 where the parallels promise 17. Start at −180: the duplicate is the seam, same as the mesh. |
 
 ---
 
@@ -137,8 +179,11 @@ Only naming a place and checking the colour underneath caught it.
 | `2k_mars.jpg` | 750 KB · `8k_mars.jpg` 8.1 MB · derived `4k_mars.jpg` 2.3 MB |
 | ring shadow bake | ~0.6 s at 1024×512, cached by light direction |
 | Saturn flattening | 0.098 — the globe really is a tenth shorter pole to pole |
+| `graticule(30)` | 17 lines — 5 parallels, 12 meridians, radius 3.002–3.012 |
+| `flat_map` | 2:1 exactly (2048×1024 source); copy lands in the cache as `flatmap-…` |
+| Earth g cross-check | G·M/R² from the table matches the quoted 9.80 to within 0.02 |
 
-Tests: `python tests/test_astro.py` — 29 checks, about 20 s (the first run
+Tests: `python tests/test_astro.py` — 42 checks, about 30 s (the first run
 downloads textures).
 
 ---
@@ -155,12 +200,26 @@ downloads textures).
 - **No rotation rates, no ephemeris.** `add_updater` and pick a speed.
 - **Gas giants have no elevation data** because they have no surface. That
   is not a gap in the helper.
+- **No globe↔map morph.** `flat_map` is the unwrapped map beside the
+  globe, full stop. An honest equirectangular morph needs a resample
+  mid-way; that is a project of its own, not a keyword.
+- **`terminator` is exact for a sphere only.** On a flattened body it is
+  drawn on the sphere of the equatorial radius — right at the equator,
+  a fraction of a percent off towards the poles.
+- **`place_on_surface` is a tangent-plane decal.** Small against the
+  radius it is faithful; continent-sized it distorts, as any flat
+  projection must. `surface_text` inherits the same limit.
+- **Moon counts are a date, not a truth.** Mid-2026 confirmed counts,
+  still rising; Saturn was 274 within living memory.
 
 ---
 
 ## 6. If you are picking this up
 
 1. `python tests/test_astro.py` — the first run pulls a few textures.
+2. `cell_note` and any `Tex` need latex + dvisvgm, plus the packages the
+   stock manimgl preamble loads: on Debian, `texlive-science` for physics,
+   and dsfont/tipa stubs if you skip `texlive-fonts-extra` (see 2.11).
 2. If a shadow seems missing, check where the sun is before checking the
    code. See 2.2.
 3. To add a body, add a row to `BODIES` in `data.py` and a line at the

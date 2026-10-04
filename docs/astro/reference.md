@@ -35,6 +35,12 @@ helper, so `wireframe`, `point_cloud` and `BuildMesh` work on them too.
 Saturn is a tenth flatter at the poles than at the equator, and it shows.
 Earth's 0.3% does not.
 
+Every body also carries its numbers: mass, surface gravity, orbit size and
+period, mean temperature and moon count — `earth.info()` prints the lot,
+and `earth.facts` is the raw `BodyFacts`. Two of those decay: moon counts
+are confirmed counts as of mid-2026 and still rising (Saturn passed 290 in
+2025), and the Moon's orbit row is measured **around Earth**, not the Sun.
+
 `named("mars", radius=3)` when the name is in a variable; `BODIES` is the
 raw table.
 
@@ -153,6 +159,15 @@ earth.arc_between((23.8, 90.4), (51.5, -0.1))     # great-circle flight path
 earth.graticule(step=30)                          # the lat/lon grid
 earth.axis_line()                                 # the pole, drawn
 
+earth.label(23.8, 90.4, "Dhaka")                  # readable text at a place
+earth.cell_note(23.8, 90.4, index=2)              # name a grid cell corner
+earth.place_on_surface(tag, 23.8, 90.4)           # bend a flat thing on
+earth.surface_text("DHAKA", 23.8, 90.4)           # ...the short form
+
+earth.equator(); earth.tropics(); earth.polar_circles()
+earth.terminator(light)                           # the day/night line
+earth.flat_map(height=3)                          # the map, unwrapped
+
 moon.orbit(earth, radius=5.2, period=9, tilt=12)
 moon.stop_orbit()
 ```
@@ -166,6 +181,76 @@ and checks land is land.
 
 `orbit` and `spin` compose — a moon can circle a planet while turning on
 its own axis.
+
+### Overlays that follow the body
+
+`marker`, `arc_between` and `graticule` take `follow=True` by default:
+the result is grafted into the body's family, so it rides along with
+every shift, spin, tilt and orbit. Pass `follow=False` for the old
+detached behaviour — you position it yourself. Anything grafted after
+construction is remembered, and `earth.shed_overlays()` takes the lot
+back off — handy between acts of a scene, where a `FadeOut` hides an
+overlay but leaves it in the family.
+
+`label(lat, lon, text, ...)` pins **readable** text to a place: the
+position tracks the body through every move, and the text re-uprights on
+the tangent plane each frame, so it never ends up on its side or facing
+into the globe. It is a billboard on the tangent plane, not a camera
+facing sprite (manimgl mobjects do not know where the camera is) and not
+a rigid painting — the letters do not tumble with the planet. `height`
+lifts it off the surface, `buff` stands it further off, and every other
+keyword reaches manimgl's `Text` — `font_size`, `font`, `color`.
+
+`cell_note(lat, lon, index)` names one corner of the graticule cell a
+place falls in: a `P_i` tag and a three-quarter ring at the corner. The
+corners run SW, SE, NE, NW from `index=0`, so the north-east corner of
+Dhaka's 30° cell is `cell_note(23.8, 90.4, index=2)` → `P₂ (30°, 120°)`.
+Keywords reach the `Tex`.
+
+Anything that builds a mobject for you passes its keywords through:
+`marker` → `DotCloud` (`radius`, `glow_factor`, `opacity`), `label` and
+`surface_text` → `Text`, `cell_note` → `Tex`, `flat_map` → `ImageMobject`,
+and the line-drawing calls → `set_stroke`.
+
+### Painting on the surface
+
+`place_on_surface(mob, lat, lon)` reads the mobject's plane as the
+tangent plane at that point — its x becomes east, its y north — and maps
+every point, bezier handles included, onto the globe. `surface_text(...)`
+is the same thing for a piece of text. For a decal short against the
+radius the result is faithful; stretch it across a hemisphere and the
+projection distortion shows, as it does on any flat map. With
+`follow=True` (the default) the paint rides along with every move.
+
+### The named circles, and the terminator
+
+`equator`, `tropics` and `polar_circles` sit at the body's own tilt —
+Earth's tropics land at ±23.44° — and on a body with no tilt the tropics
+degenerate to the equator. `graticule` now takes a tuple step
+`graticule((20, 40))`, can `highlight` the equator, tropics and poles in
+its own colour (`highlight=True` takes all three; a named circle is
+drawn even when the step would miss it — no round step lands on 23.44°),
+and can pin latitude `labels` that stay readable.
+
+`terminator(light)` draws the day/night line for a light at that scene
+point. It is exact for a **sphere**; on a flattened body like Saturn the
+line is drawn on the sphere of the equatorial radius, which is right at
+the equator and off by a fraction of a percent towards the poles.
+
+### `flat_map`
+
+```python
+earth.flat_map(height=3)                    # the day map, 2:1
+earth.flat_map(night=True, graticule=True)  # the night map, ruled
+```
+
+The equirectangular rectangle the globe was wrapped from, at its natural
+2:1. It works from a copy in the cache by default (`copy_texture=False`
+reads the original file instead), so later painting can never touch the
+download. A flat map is a separate mobject: it does not follow the body,
+and there is deliberately **no morph** between globe and map — a honest
+equirectangular morph needs a resample mid-way, which is a project of
+its own. Move it with the usual mobject methods.
 
 ### `rings`
 

@@ -40,11 +40,11 @@ project starting from the same blank file.
 
 | helper | what it gives you | status | docs |
 | --- | --- | --- | --- |
-| **`obj`** | Wavefront `.obj` models as native mobjects — loading, axis conversion, materials, per-pixel texturing, decimate / subdivide / displace, wireframes, point clouds, build-up animation | working, 29 tests | [reference](docs/obj/reference.md) · [notes](docs/obj/notes.md) · [guide (বাংলা)](docs/obj/guide_bn.md) |
+| **`obj`** | Wavefront `.obj` models as native mobjects — loading, axis conversion, materials, per-pixel texturing, decimate / subdivide / displace, wireframes, point clouds, build-up animation | working, 21 tests | [reference](docs/obj/reference.md) · [notes](docs/obj/notes.md) · [guide (বাংলা)](docs/obj/guide_bn.md) |
 
 | **`shapes`** | meshes from formulas rather than files — `revolve` an outline, `extrude` a cross-section along a path, or `from_surface` any ManimGL surface into the toolkit | working, 18 tests | [reference](docs/shapes/reference.md) · [notes](docs/shapes/notes.md) |
 
-| **`astro`** | planets, moons and rings that know their own radius, flattening, axial tilt and ring edges — with both Saturn shadows solved and painted in | working, 29 tests | [reference](docs/astro/reference.md) · [notes](docs/astro/notes.md) |
+| **`astro`** | planets, moons and rings that know their own radius, flattening, tilt, ring edges, mass, gravity and moons — markers, arcs and readable labels that ride along, tropics, terminator, `flat_map`, and both Saturn shadows solved and painted in | working, 42 tests | [reference](docs/astro/reference.md) · [notes](docs/astro/notes.md) |
 
 [`docs/adding-a-helper.md`](docs/adding-a-helper.md) is the shape the next
 one should take.
@@ -110,7 +110,7 @@ docs/
     └── notes.md
 
 examples/                  runnable scenes, one folder per helper
-tests/                     obj 21 + shapes 18 + astro 29 = 68 checks
+tests/                     obj 21 + shapes 18 + astro 42 = 81 checks
 ```
 
 ---
@@ -120,7 +120,7 @@ tests/                     obj 21 + shapes 18 + astro 29 = 68 checks
 ```bash
 python tests/test_obj.py        # 21 checks, ~9 s
 python tests/test_shapes.py     # 18 checks, ~3 s
-python tests/test_astro.py      # 29 checks, ~40 s (fetches textures once)
+python tests/test_astro.py      # 42 checks, ~30 s (fetches textures once)
 ```
 
 Every check corresponds to something that was once broken, so a failure

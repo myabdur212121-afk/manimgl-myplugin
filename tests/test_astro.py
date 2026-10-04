@@ -398,6 +398,239 @@ def test_info_reads_sensibly():
     assert "60,268 km" in text and "C" in text and "A" in text
 
 
+# ------------------------------------------------- new facts and overlays --
+
+def test_the_new_facts_are_on_every_body():
+    for key, f in BODIES.items():
+        for field in ("mass_kg", "surface_gravity_m_s2", "semi_major_axis_m",
+                      "orbital_period_days", "mean_temp_c", "moon_count"):
+            assert getattr(f, field) is not None, (key, field)
+    assert abs(BODIES["earth"].mass_kg - 5.9722e24) < 0.01e24
+    assert abs(BODIES["earth"].surface_gravity_m_s2 - 9.8) < 0.1
+    assert BODIES["saturn"].moon_count >= 274        # 293 confirmed mid-2026
+    assert BODIES["jupiter"].moon_count >= 95
+    assert BODIES["moon"].semi_major_axis_m < 1e9     # around Earth, not the Sun
+    # cross-check: gravity tracks G M / R^2 for the rocky planets
+    for key in ("mercury", "venus", "earth", "mars"):
+        f = BODIES[key]
+        g_calc = 6.674e-11 * f.mass_kg / f.equatorial_radius_m ** 2
+        assert abs(g_calc - f.surface_gravity_m_s2) < 0.6, key
+
+
+def test_points_at_agrees_with_point_at():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    lats, lons = [23.8, -33.9, 0.0, 71.2], [90.4, 151.2, -45.0, 0.0]
+    vec = earth._points_at(lats, lons, [0.05] * 4)
+    for i, (la, lo) in enumerate(zip(lats, lons)):
+        assert np.allclose(vec[i], earth.point_at(la, lo, 0.05), atol=1e-6)
+
+
+def test_an_overlay_does_not_move_the_body():
+    """
+    Grafting a marker or an arc on one side shifted the family bounding
+    box, so the body's own centre -- and with it point_at -- wandered.
+    The centre is the globe's now.
+    """
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    c0 = earth.get_center().copy()
+    p0 = earth.point_at(23.8, 90.4)
+    earth.marker(23.8, 90.4)
+    earth.arc_between((23.8, 90.4), (51.5, -0.1))
+    assert np.allclose(earth.get_center(), c0, atol=1e-9)
+    assert np.allclose(earth.point_at(23.8, 90.4), p0, atol=1e-9)
+
+
+def test_markers_and_arcs_follow_the_body():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    dot = earth.marker(23.8, 90.4)
+    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1))
+    d0 = np.asarray(dot.get_points()).copy()
+    a0 = np.asarray(arc.get_points()).copy()
+
+    earth.shift([2.0, 0.0, 0.0])
+    assert np.allclose(np.asarray(dot.get_points()), d0 + [2, 0, 0], atol=1e-6)
+    assert np.allclose(np.asarray(arc.get_points()), a0 + [2, 0, 0], atol=1e-6)
+
+    earth.rotate(np.pi / 6, np.array([0.0, 0.0, 1.0]),
+                 about_point=earth.get_center())
+    assert not np.allclose(np.asarray(dot.get_points()), d0 + [2, 0, 0],
+                           atol=1e-4)      # it turned with the body too
+
+
+def test_a_label_stays_pinned_and_readable():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    lbl = earth.label(23.8, 90.4, "Dhaka", font_size=30)
+
+    # a shift is plain: point_at still knows where the body is
+    earth.shift([1.5, 0.0, 0.0])
+    lbl.update(0)
+    radial = earth.point_at(23.8, 90.4, 0.10) - earth.get_center()
+    target = earth.get_center() + radial + 0.02 * radial / np.linalg.norm(radial)
+    assert np.linalg.norm(lbl.get_all_points().mean(0) - target) < 0.15
+
+    # the text plane faces out of the surface, not into it
+    pts = lbl.get_all_points()
+    normal = np.linalg.svd(pts - pts.mean(0))[2][-1]
+    radial /= np.linalg.norm(radial)
+    assert abs(normal @ radial) > 0.95
+
+    # a rotation is beyond point_at's analytic reach, so expect it by hand:
+    # the pin point rides along with the body, and the text re-uprights
+    # around it on the new tangent plane
+    c1 = earth.get_center().copy()
+    pin = target.copy()
+    earth.rotate(np.pi / 5, np.array([0.0, 0.0, 1.0]), about_point=c1)
+    lbl.update(0)
+    v = pin - c1
+    phi = np.pi / 5
+    expected = c1 + np.array([v[0] * np.cos(phi) - v[1] * np.sin(phi),
+                               v[0] * np.sin(phi) + v[1] * np.cos(phi), v[2]])
+    assert np.linalg.norm(lbl.get_all_points().mean(0) - expected) < 0.15
+
+
+def test_kwargs_reach_the_text():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    small = earth.label(0, 0, "X", font_size=18, follow=False)
+    big = earth.label(0, 0, "X", font_size=54, follow=False)
+    assert big.get_height() > small.get_height() * 2
+
+
+def test_graticule_highlight_and_labels():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    grid = earth.graticule(30)
+    assert len(grid) == 17                       # 5 parallels + 12 meridians
+    mixed = earth.graticule((20, 40), follow=False)
+    # 8 parallels at step 20, plus the equator the default highlight adds
+    # because no multiple of 20 lands on it, plus 9 meridians
+    assert len(mixed) == 9 + 9
+
+    tagged = earth.graticule(30, labels=True)
+    assert len(tagged) == 17 + 5                 # five pinned latitude tags
+    assert sum(1 for m in tagged if m.updaters) == 5
+
+    # a named circle is drawn even when the step misses it: no round step
+    # lands on Earth's 23.44-degree tropics
+    tropics = earth.graticule(30, highlight="tropics", follow=False)
+    assert len(tropics) == 17 + 2
+    everything = earth.graticule(30, highlight=True, follow=False)
+    assert len(everything) == 17 + 4             # tropics + polar circles
+
+
+def test_tropics_and_polar_circles_sit_at_the_tilt():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    tropics = earth.tropics()
+    assert len(tropics) == 2
+    target = earth.point_at(23.44, 0, 0.004)     # Earth's own tilt
+    d = np.linalg.norm(np.asarray(tropics[0].get_points()) - target, axis=1)
+    assert d.min() < 0.05
+
+    circles = earth.polar_circles()
+    target2 = earth.point_at(90 - 23.44, 0, 0.004)
+    d2 = np.linalg.norm(np.asarray(circles[0].get_points()) - target2, axis=1)
+    assert d2.min() < 0.05
+
+    untilted = Body(radius=2)
+    assert len(untilted.tropics()) == 1          # the equator stands in
+
+
+def test_terminator_faces_the_light():
+    if _skip():
+        return
+    body = Body(radius=3)                        # no tilt, no texture: a sphere
+    light = np.array([9.0, -4.0, 3.0])
+    line = body.terminator(light)
+    pts = np.asarray(line.get_points())
+    d = light - body.get_center()
+    dots = (pts - body.get_center()) @ d
+    # every point sees the light on its horizon: surface ~ perpendicular to it
+    assert np.abs(dots).max() < 0.05 * np.linalg.norm(d) * 3
+    r = np.linalg.norm(pts - body.get_center(), axis=1)
+    assert 2.9 < r.min() and r.max() < 3.1
+
+
+def test_flat_map_is_two_to_one_and_works_from_a_copy():
+    if _skip():
+        return
+    from manimgl_myplugin.obj.loader import CACHE_DIR
+    earth = Earth(radius=2, shadows=False)
+    fmap = earth.flat_map(height=2)
+    assert type(fmap[0]).__name__ == "ImageMobject"
+    assert abs(fmap[0].get_width() / fmap[0].get_height() - 2.0) < 0.05
+    assert (CACHE_DIR / "flatmap-2k_earth_daymap.jpg").exists()
+    ruled = earth.flat_map(height=2, graticule=True)
+    assert len(ruled) == 2                       # the image, then the grid
+
+
+def test_surface_text_curves_onto_the_globe():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    tag = earth.surface_text("DHAKA", 23.8, 90.4, font_size=26)
+    assert any(tag is m for m in earth.submobjects)     # painted on, it follows
+    pts = tag.get_all_points()
+    r = np.linalg.norm(pts - earth.get_center(), axis=1)
+    a = np.radians(23.8)
+    shell = np.sqrt((earth.radius * np.cos(a)) ** 2
+                    + (earth.radius * earth._polar_scale() * np.sin(a)) ** 2)
+    assert np.abs(r - shell * 1.015).max() < 0.03      # every point on the shell
+
+
+def test_shed_overlays_takes_the_body_back_to_birth():
+    """Markers, arcs, anchors and decals all graft in; one call must take
+    every one back off without moving the body."""
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    base = len(earth.submobjects)
+    c0 = earth.get_center().copy()
+    earth.marker(23.8, 90.4)
+    earth.arc_between((23.8, 90.4), (51.5, -0.1))
+    lbl = earth.label(23.8, 90.4, "X", font_size=20)
+    earth.surface_text("Y", 0.0, 0.0, font_size=20)
+    assert len(earth.submobjects) > base
+
+    earth.shed_overlays()
+    assert len(earth.submobjects) == base
+    assert not earth._overlays
+    assert np.allclose(earth.get_center(), c0, atol=1e-9)
+    # the shed label's updater must no longer pull on anything live
+    assert lbl.updaters
+    earth.shed_overlays()      # a second shed is a quiet no-op
+
+
+def test_cell_note_names_the_right_corner():
+    import shutil
+    if _skip():
+        return
+    if shutil.which("latex") is None or shutil.which("dvisvgm") is None:
+        print("      (no latex toolchain -- the Tex half waits for it)")
+        return
+    earth = Earth(radius=3, shadows=False)
+    note = earth.cell_note(23.8, 90.4, index=2, step=30)
+    assert len(note) == 2
+    from manimlib.mobject.svg.tex_mobject import Tex
+    assert isinstance(note[0], Tex)
+    # the ring sits on the north-east corner of the (0..30, 90..120) cell
+    p = earth.point_at(30, 120, 0.02)
+    d = np.linalg.norm(np.asarray(note[1].get_points()) - p, axis=1)
+    assert abs(d.max() - d.min()) < 0.02          # a rigid ring, one radius
+    assert d.mean() > 0.05
+
+
 def main():
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]

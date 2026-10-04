@@ -15,3 +15,6 @@ secrets/
 # manim output
 media/
 videos/**/media/
+
+# manimgl tex compile cache (lands in cwd when running tests)
+latex_cache/

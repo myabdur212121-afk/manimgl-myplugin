@@ -49,6 +49,18 @@ class BodyFacts:
     #: Sidereal rotation period in hours. Negative means retrograde --
     #: Venus and Uranus really do turn the other way.
     rotation_period_h: float = 24.0
+    #: Mass in kg, and surface gravity in m/s2 -- what any later physics
+    #: (weight, orbits, escape velocity) will want first.
+    mass_kg: float | None = None
+    surface_gravity_m_s2: float | None = None
+    #: Mean distance from what the body orbits, in metres. For the Moon
+    #: that is Earth, not the Sun.
+    semi_major_axis_m: float | None = None
+    orbital_period_days: float | None = None
+    mean_temp_c: float | None = None
+    #: Confirmed moons, mid-2026. This one keeps rising -- Saturn was at
+    #: 274 in March 2025 and 293 a year later -- so treat it as "at least".
+    moon_count: int | None = None
     note: str = ""
 
 
@@ -75,30 +87,59 @@ _NEPTUNE_RINGS = (RingBand(2.15, 2.16, 0.12, "Adams"),)
 
 BODIES: dict[str, BodyFacts] = {
     "mercury": BodyFacts("Mercury", 2_439_700, 0.0, 0.03, "mercury",
-                       rotation_period_h=1407.6),
+                       rotation_period_h=1407.6,
+                       mass_kg=0.33010e24, surface_gravity_m_s2=3.7,
+                       semi_major_axis_m=57.909e9, orbital_period_days=87.969,
+                       mean_temp_c=167, moon_count=0),
     "venus": BodyFacts("Venus", 6_051_800, 0.0, 177.4, "venus_atmosphere",
                        note="the cloud deck, not the surface",
-                       rotation_period_h=-5832.5),
+                       rotation_period_h=-5832.5,
+                       mass_kg=4.8673e24, surface_gravity_m_s2=8.9,
+                       semi_major_axis_m=108.209e9, orbital_period_days=224.701,
+                       mean_temp_c=464, moon_count=0),
     "earth": BodyFacts("Earth", 6_378_137, 0.003353, 23.44, "earth_daymap",
                        night_texture="earth_nightmap",
-                       rotation_period_h=23.9345),
+                       rotation_period_h=23.9345,
+                       mass_kg=5.9722e24, surface_gravity_m_s2=9.8,
+                       semi_major_axis_m=149.596e9, orbital_period_days=365.256,
+                       mean_temp_c=15, moon_count=1),
     "moon": BodyFacts("Moon", 1_737_400, 0.0012, 6.68, "moon",
-                       rotation_period_h=655.72),
+                       rotation_period_h=655.72,
+                       mass_kg=0.07346e24, surface_gravity_m_s2=1.6,
+                       semi_major_axis_m=3.844e8, orbital_period_days=27.322,
+                       mean_temp_c=-23, moon_count=0,
+                       note="orbits Earth, so its distance and period are "
+                            "around us, not the Sun"),
     "mars": BodyFacts("Mars", 3_396_190, 0.005886, 25.19, "mars",
-                       rotation_period_h=24.6229),
+                       rotation_period_h=24.6229,
+                       mass_kg=0.64169e24, surface_gravity_m_s2=3.7,
+                       semi_major_axis_m=227.923e9, orbital_period_days=686.980,
+                       mean_temp_c=-65, moon_count=2),
     "jupiter": BodyFacts("Jupiter", 71_492_000, 0.06487, 3.13, "jupiter",
                          rings=_JUPITER_RINGS, solid=False,
-                       rotation_period_h=9.925),
+                       rotation_period_h=9.925,
+                       mass_kg=1898.13e24, surface_gravity_m_s2=24.8,
+                       semi_major_axis_m=778.570e9, orbital_period_days=4332.589,
+                       mean_temp_c=-110, moon_count=115),
     "saturn": BodyFacts("Saturn", 60_268_000, 0.09796, 26.73, "saturn",
                         rings=_SATURN_RINGS, solid=False,
-                       rotation_period_h=10.656),
+                       rotation_period_h=10.656,
+                       mass_kg=568.32e24, surface_gravity_m_s2=10.4,
+                       semi_major_axis_m=1433.529e9, orbital_period_days=10759.22,
+                       mean_temp_c=-140, moon_count=293),
     "uranus": BodyFacts("Uranus", 25_559_000, 0.02293, 97.77, "uranus",
                         rings=_URANUS_RINGS, solid=False,
                         note="tipped on its side, so the rings stand up",
-                       rotation_period_h=-17.24),
+                       rotation_period_h=-17.24,
+                       mass_kg=86.811e24, surface_gravity_m_s2=8.7,
+                       semi_major_axis_m=2872.463e9, orbital_period_days=30688.5,
+                       mean_temp_c=-195, moon_count=29),
     "neptune": BodyFacts("Neptune", 24_764_000, 0.01708, 28.32, "neptune",
                          rings=_NEPTUNE_RINGS, solid=False,
-                       rotation_period_h=16.11),
+                       rotation_period_h=16.11,
+                       mass_kg=102.409e24, surface_gravity_m_s2=11.2,
+                       semi_major_axis_m=4495.060e9, orbital_period_days=60195,
+                       mean_temp_c=-200, moon_count=16),
 }
 
 
