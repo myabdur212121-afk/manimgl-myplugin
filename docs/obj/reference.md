@@ -151,6 +151,7 @@ Assembles the model out of its own triangles. `order` can be an axis,
 
 | where | default | why |
 | --- | --- | --- |
+| size (`height` / `width` / `depth` / `scale`) | `None` — as authored | a chair stays chair-sized next to a building |
 | `up_axis` | `"y"` | the OBJ convention; CAD exports say `"z"` |
 | `center` | `True` | a model belongs where you are looking, not where its author left it |
 | `depth_test` | `True` | a solid model should hide its own back |

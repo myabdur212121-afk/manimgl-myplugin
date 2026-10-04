@@ -36,7 +36,7 @@ class Geography(ThreeDScene):
         self.add(earth, code)
         dots, tags = Group(), VGroup()
         for name, lat, lon in PLACES:
-            dots.add(earth.marker(lat, lon, size=0.07))
+            dots.add(earth.marker(lat, lon))
             tag = Text(name, font=MONO, font_size=17, color=INK)
             tag.rotate(PI / 2, RIGHT)
             tag.move_to(earth.point_at(lat, lon, 0.28))

@@ -326,6 +326,38 @@ def test_height_lifts_a_marker_clear_of_the_surface():
     assert abs(high / low - 1.1) < 0.01
 
 
+def test_marker_default_size_is_the_ring_scale():
+    """
+    Notes 2.16: the default grew from 0.05 (an invisible 4x3 px dot at
+    the demo framing) to 0.10 -- the cell_note ring's number and scale,
+    so a dot and a ring on one globe read as one family.
+    """
+    if _skip():
+        return
+    import inspect
+    from manimgl_myplugin.astro.bodies import Body
+    sig = inspect.signature(Body.marker)
+    assert abs(sig.parameters["size"].default - 0.10) < 1e-12
+    earth = Earth(radius=3, shadows=False)
+    dot = earth.marker(23.8, 90.4)
+    assert abs(dot.radius - 0.10) < 1e-9            # size * radius / 3
+
+
+def test_cell_note_ring_uses_the_family_width():
+    """
+    The ring's stroke was a literal 2.0 that happened to equal
+    OVERLAY_WIDTH; it now reads the constant, so a future width change
+    cannot strand it (notes 2.16).
+    """
+    if _skip():
+        return
+    from manimgl_myplugin.astro.bodies import OVERLAY_WIDTH
+    earth = Earth(radius=3, shadows=False)
+    ring = earth.cell_note(23.8, 90.4, index=2)[1]
+    widths = np.unique(np.asarray(ring.get_stroke_widths(), dtype=float))
+    assert len(widths) == 1 and abs(widths[0] - OVERLAY_WIDTH) < 1e-12
+
+
 def test_arc_between_leaves_the_surface_and_comes_back():
     if _skip():
         return

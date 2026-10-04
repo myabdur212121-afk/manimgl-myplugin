@@ -154,7 +154,7 @@ answers move too.
 ```python
 earth.point_at(23.8, 90.4)                        # Dhaka, in scene coords
 earth.point_at(23.8, 90.4, height=0.1)            # lifted off the surface
-earth.marker(23.8, 90.4, color=GOLD, size=0.07)   # a dot pinned to a place
+earth.marker(23.8, 90.4)                          # a dot pinned to a place
 earth.arc_between((23.8, 90.4), (51.5, -0.1))     # great-circle flight path
 earth.graticule(step=30)                          # the lat/lon grid
 earth.axis_line()                                 # the pole, drawn
@@ -316,7 +316,7 @@ and choose.
 | named circles | gold, 1.4× the width | the named circle is the feature |
 | `arc_between` width | 2.0 | it flies, not hugs — no leak measured at 2.0 |
 | `arc_between` height | 0.22 | leaves and lands flat, rises mid-way |
-| `marker` size / height | 0.05 / 0.01 | a dot, not a moon; clear of the ground |
+| `marker` size / height | 0.10 / 0.01 | the `cell_note` ring's twin; clear of the ground |
 | `label` height / buff | 0.10 / 0.02 | far enough off the surface to read |
 | `cell_note` ring | radius 0.10, width 2 | a callout, deliberately small and light |
 | `axis_line` | thin, X-ray | a gauge, not geography — the buried half is the point |

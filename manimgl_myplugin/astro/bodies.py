@@ -550,7 +550,7 @@ class Body(Group):
         return self.get_center() + pts
 
     def marker(self, lat: float, lon: float, color=GOLD_MARKER,
-               size: float = 0.05, height: float = 0.01,
+               size: float = 0.10, height: float = 0.01,
                follow: bool = True, see_through: bool = False,
                **kwargs) -> DotCloud:
         """
@@ -561,7 +561,9 @@ class Body(Group):
             self.add(earth.marker(23.8, 90.4))          # Dhaka
 
         Lifted very slightly off the ground by default, or the depth test
-        leaves it half buried in the texture.
+        leaves it half buried in the texture. The default size is the
+        :meth:`cell_note` ring's, so a dot and a ring on one globe read
+        as one family.
 
         ``follow`` (the default) grafts the dot into the body, so shifting,
         rotating, :meth:`spin` or :meth:`orbit` all carry it along at no
@@ -1062,7 +1064,7 @@ class Body(Group):
                    radius=arc_radius * self.radius / 3.0)
         ring.set_points(np.asarray(ring.get_points())
                         @ np.stack([right, up, n], axis=1) + p)
-        ring.set_stroke(color, 2.0)
+        ring.set_stroke(color, OVERLAY_WIDTH)
 
         self._pinned_text(tag, clat, clon, height=0.02,
                           buff=arc_radius * self.radius / 1.2, follow=follow)

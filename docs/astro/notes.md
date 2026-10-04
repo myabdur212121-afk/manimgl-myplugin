@@ -194,6 +194,16 @@ draw until asked.
 | **What still holds** | The machinery is untouched: z_index still asks for the turn after the body, the depth-test flags are still set, the X-ray updater still outlives `ThreeDScene.add`. A thin stroke is simply past what the depth test can hold. |
 | **Escape** | `width=6` on any hugging call (the specials then run 8.4) restores the fully hidden line — one keyword, nothing else changes. |
 
+### 2.16 The marker grew to the ring's size
+
+| | |
+| --- | --- |
+| **Symptom** | The default `marker` size, 0.05, drew a 4×3-pixel dot at the demo framing (720p, `Earth(radius=2.4)`) — 11 gold pixels, invisible at a glance. Both scenes that show it (`tour.py`, `examples/astro/03_geography.py`) silently overrode it with `size=0.07` while the on-screen code promised a bare call. |
+| **Measure** | The ladder, same framing: 0.05 → 11 px (4×3), 0.07 → 47 px (8×8), 0.10 → 112 px (13×13), 0.15 → 262 px (21×20). 0.10 is the comfortable dot; 0.15 already reads as a moon. |
+| **Fix** | `size: float = 0.10` — the same number and the same ×radius/3 scaling as the `cell_note` ring, so a dot and a ring on one globe are one family. The two silent overrides are gone; the bare call now shows what the on-screen code always claimed. |
+| **Also** | The ring's stroke was a literal 2.0; it now reads `OVERLAY_WIDTH`, so a future width change cannot strand it. |
+| **Guard** | `test_marker_default_size_is_the_ring_scale`, `test_cell_note_ring_uses_the_family_width`. |
+
 ---
 
 ## 3. Directions that do not work
