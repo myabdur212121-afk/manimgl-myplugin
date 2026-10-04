@@ -563,7 +563,9 @@ class Body(Group):
         Lifted very slightly off the ground by default, or the depth test
         leaves it half buried in the texture. The default size is the
         :meth:`cell_note` ring's, so a dot and a ring on one globe read
-        as one family.
+        as one family. The dot is drawn at a fixed screen size, so it
+        stays readable however close the camera comes -- a pin, not
+        a ball.
 
         ``follow`` (the default) grafts the dot into the body, so shifting,
         rotating, :meth:`spin` or :meth:`orbit` all carry it along at no
