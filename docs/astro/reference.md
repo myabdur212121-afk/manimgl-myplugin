@@ -201,15 +201,17 @@ renderer has three ways to hide a line, see notes 2.13): the overlay
 draws after its body because it asks for the turn with `z_index`,
 an X-ray overlay re-states its freedom every frame so that
 `ThreeDScene.add` cannot take it back, and every hugging stroke is
-drawn at `OVERLAY_WIDTH` (6) because a thin stroke slips past the
-depth test in this build — the measured floor is 5, and the margin
-covers other framings (notes 2.14). The named circles run
-`SPECIAL_WIDTH_FACTOR` (1.4×) heavier, gold. Two deliberate
-exceptions: `arc_between` keeps a light 2.0 — it flies above the
-surface, and no leak was measured there — and `axis_line` is a thin
-X-ray guide, so the buried middle of the pole stays visible while
-you watch a spin. `clear_updaters()` on a returned X-ray mobject
-takes back manual control.
+drawn at `OVERLAY_WIDTH` (2) — the light look, chosen with the
+trade measured: a thin stroke slips past the depth test in this
+build (the floor is 5), so at the default roughly a quarter of the
+far cage still shows through the globe, and `width=6` is where the
+line is hidden completely (notes 2.14, 2.15). The named circles run
+`SPECIAL_WIDTH_FACTOR` (1.4×) heavier, gold. `arc_between` matches
+the family at 2.0 and flies, where no leak was measured. One
+deliberate exception stays: `axis_line` is a thin X-ray guide, so
+the buried middle of the pole stays visible while you watch a spin.
+`clear_updaters()` on a returned X-ray mobject takes back manual
+control.
 
 The API system is: **a call builds, returns a mobject, and the work
 happens on that mobject with ordinary manim.** Parameters exist only
@@ -310,7 +312,7 @@ and choose.
 | `graticule` step | 30° | the SurfaceMesh spacing; 17 lines on a globe |
 | grid colour | `#8FE8FF` | ice blue, reads over ocean and land alike |
 | grid height | 0.004 | clear of the texture, close enough to hug |
-| hugging line width | 6 = `OVERLAY_WIDTH` | the depth-test floor (5) plus margin — notes 2.14 |
+| hugging line width | 2 = `OVERLAY_WIDTH` | the light look; at 2 a quarter of the far cage still shows — `width=6` holds it fully (notes 2.14–2.15) |
 | named circles | gold, 1.4× the width | the named circle is the feature |
 | `arc_between` width | 2.0 | it flies, not hugs — no leak measured at 2.0 |
 | `arc_between` height | 0.22 | leaves and lands flat, rises mid-way |

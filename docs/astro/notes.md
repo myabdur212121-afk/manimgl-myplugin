@@ -185,6 +185,15 @@ draw until asked.
 | **Acquittal** | `arc_between` was charged with the same leak and cleared: it flies above the surface, and only its endpoints hug. An arc laid wholly on the far side measured 0.000 of its X-ray self at width 2 and 0.000 at 6; an arc crossing the horizon measured 0.844 at 2 against 0.892 at 6. No shine-through at its light width, so it keeps 2.0 — pressed flat with `height=0` it becomes a hugging stroke and wants `OVERLAY_WIDTH`, and the docstring says so. |
 | **Guard** | `test_the_mesh_stops_at_the_globe` — width 6 on the grid, 8.4 on the equator and the tropics, 2.0 on the arc, and the axis's depth-off flag with its updater. |
 
+### 2.15 The default went to 2 anyway
+
+| | |
+| --- | --- |
+| **Decision** | The maintainer watched width 2 and width 1 side by side (`our-work/videos/Width2.mp4`, `Width1.mp4`, with the measured sheets beside them) and chose 2 for the default: the light line reads better to his eye than the fully hidden one. A taste call, made with the numbers on the table. |
+| **Measure** | At the demo framing, noise-corrected: width 2 keeps 0.680 of the grid's X-ray self — the near hemisphere (0.443) plus a quarter of the cage that should be hidden — and width 6 keeps 0.441, the fully honest line. The specials at 1.4× (2.8) sit below the floor too. |
+| **What still holds** | The machinery is untouched: z_index still asks for the turn after the body, the depth-test flags are still set, the X-ray updater still outlives `ThreeDScene.add`. A thin stroke is simply past what the depth test can hold. |
+| **Escape** | `width=6` on any hugging call (the specials then run 8.4) restores the fully hidden line — one keyword, nothing else changes. |
+
 ---
 
 ## 3. Directions that do not work
@@ -224,6 +233,7 @@ draw until asked.
 | width ladder (API, demo framing) | 3 → 0.50 · 4 → 0.47 · 5 → 0.45 · 6 → 0.45 · 8–12 → 0.44 of the X-ray self; leak over the 0.443 asymptote: +5.3% at 3, +1.0% at 5, +0.6% at 6 |
 | equator, before and after | 2.2 → 0.555 (leaking); 8.4 → 0.429 (holds) — same framing, magenta-dominant counting |
 | axis, X-ray against honest | 2032 px against 399: the guide shows its buried middle, the honest axis only its two tips |
+| default width 2 (chosen) | 0.680 of the X-ray self at the demo framing — a quarter of the far cage shows; width 6 holds at 0.441 |
 | Earth g cross-check | G·M/R² from the table matches the quoted 9.80 to within 0.02 |
 
 Tests: `python tests/test_astro.py` — 46 checks, about 40 s (the first run

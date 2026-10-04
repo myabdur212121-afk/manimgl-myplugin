@@ -71,12 +71,13 @@ def _apply_occlusion(mob, see_through: bool):
 #: both a blue planet and a red one.
 GOLD_MARKER = "#F2B33D"
 
-#: One width for every stroke that hugs the surface and has to be
-#: hidden behind it. The depth test only bites on a stroke a few
-#: pixels wide -- thinner, and the far side shines through whatever
-#: the flags say. The measured floor is 5; 6 keeps a margin for
-#: other framings (notes 2.13, 2.14).
-OVERLAY_WIDTH = 6.0
+#: One width for every stroke that hugs the surface. The depth test
+#: only bites on a stroke a few pixels wide -- the measured floor is
+#: 5 -- so at this light default the far side of a hugging line
+#: still shows through a little. The maintainer chose that look with
+#: the numbers on the table (notes 2.14, 2.15); width 6 is where
+#: the line holds completely.
+OVERLAY_WIDTH = 2.0
 
 #: The named circles are the feature, so they run visibly heavier
 #: than the plain grid around them.
@@ -589,9 +590,10 @@ class Body(Group):
         line leaves and lands flat and rises in the middle -- a flight path
         rather than a chord through the planet. The default width is
         light on purpose: the arc flies above the surface, where the
-        depth test has nothing against it; press it flat with
-        ``height=0`` and it becomes a hugging stroke that wants
-        ``OVERLAY_WIDTH``.
+        depth test has nothing against it. Press it flat with
+        ``height=0`` and it becomes a hugging stroke -- and a thin
+        hugging stroke shows its far side, so ask for ``width=6``
+        when you want that hidden.
 
         ``follow`` (the default) grafts the arc into the body so it rides
         along with every shift, rotate, spin and orbit. ``color`` and
@@ -614,9 +616,10 @@ class Body(Group):
         arc = VMobject().set_points_smoothly(
             self.get_center() + path * lift[:, None])
         # it flies, not hugs: two probes measured no leak at this
-        # width (notes 2.14), and a light line reads as a route rather
-        # than geography. Pressed flat with height=0 it becomes a
-        # hugging stroke -- then it wants OVERLAY_WIDTH.
+        # width (notes 2.14), and a light line reads as a route
+        # rather than geography -- the family default now. Pressed
+        # flat with height=0 it becomes a hugging stroke, and a thin
+        # hugging stroke shows its far side: width 6 holds it.
         arc.set_stroke(kwargs.pop("color", GOLD_MARKER),
                        kwargs.pop("width", 2.0), **kwargs)
         _apply_occlusion(arc, see_through)
@@ -662,12 +665,11 @@ class Body(Group):
         the depth test does not eat them, ``follow`` grafts them into the
         body like :meth:`marker`, and ``see_through=True`` keeps the
         far side shining through the globe -- the X-ray view, the
-        whole cage at once. The default width, 6, is fat by manim
-        standards and deliberately so: this renderer only holds a
-        stroke at the depth test once it is a few pixels wide, and a
-        thin grid leaks its far side (notes 2.13); the floor was
-        measured at 5, and the margin covers other framings (notes
-        2.14). ``**kwargs`` reach
+        whole cage at once. The default width, 2, is the light look,
+        chosen with the trade measured: this renderer only holds a
+        stroke at the depth test from about 5 up, so at 2 the far
+        side of the grid shows through faintly (notes 2.13-2.15);
+        ``width=6`` hides it completely. ``**kwargs`` reach
         ``set_stroke``.
         """
         if isinstance(step, (tuple, list)):

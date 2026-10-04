@@ -582,9 +582,11 @@ def test_the_mesh_stops_at_the_globe():
     the body with z_index (the draw order of equal-index mobjects is
     not stable between renders), and an X-ray overlay re-states its
     freedom every frame, because ThreeDScene.add force-applies the
-    depth test to whatever it is handed. The grid is drawn wide
-    (``OVERLAY_WIDTH``, 6) on purpose: thin strokes leak past the
-    depth test -- the measured floor is 5 (notes 2.13, 2.14).
+    depth test to whatever it is handed. The grid is drawn at
+    ``OVERLAY_WIDTH`` (2, the light look of notes 2.15): the depth
+    test only holds a hugging stroke from about 5 up, so at the
+    default a quarter of the far cage still shows. The flags,
+    z_index and the updater are the machinery this test guards.
     """
     if _skip():
         return
@@ -612,7 +614,7 @@ def test_the_mesh_stops_at_the_globe():
     # one width for every hugging stroke, the named circles heavier,
     # the axis an X-ray guide (notes 2.14)
     # the arc flies rather than hugs -- no leak measured at its
-    # light width (notes 2.14); the hugging family carries OVERLAY_WIDTH
+    # light width (notes 2.14); it matches the family default now
     arc = earth.arc_between((23.8, 90.4), (51.5, -0.1), follow=False)
     assert arc.data["stroke_width"][0] == 2.0
     assert earth.equator().data["stroke_width"][0] == (
