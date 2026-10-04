@@ -536,6 +536,10 @@ def test_tropics_and_polar_circles_sit_at_the_tilt():
     earth = Earth(radius=3, shadows=False)
     tropics = earth.tropics()
     assert len(tropics) == 2
+    from manimgl_myplugin.astro.bodies import (OVERLAY_WIDTH,
+                                               SPECIAL_WIDTH_FACTOR)
+    assert (tropics[0].data["stroke_width"][0]
+            == OVERLAY_WIDTH * SPECIAL_WIDTH_FACTOR)
     target = earth.point_at(23.44, 0, 0.004)     # Earth's own tilt
     d = np.linalg.norm(np.asarray(tropics[0].get_points()) - target, axis=1)
     assert d.min() < 0.05
@@ -578,16 +582,19 @@ def test_the_mesh_stops_at_the_globe():
     the body with z_index (the draw order of equal-index mobjects is
     not stable between renders), and an X-ray overlay re-states its
     freedom every frame, because ThreeDScene.add force-applies the
-    depth test to whatever it is handed. The grid is drawn wide (8)
-    on purpose: thin strokes leak past the depth test, notes 2.13.
+    depth test to whatever it is handed. The grid is drawn wide
+    (``OVERLAY_WIDTH``, 6) on purpose: thin strokes leak past the
+    depth test -- the measured floor is 5 (notes 2.13, 2.14).
     """
     if _skip():
         return
+    from manimgl_myplugin.astro.bodies import (OVERLAY_WIDTH,
+                                               SPECIAL_WIDTH_FACTOR)
     earth = Earth(radius=3, shadows=False)
     mesh = earth.graticule(30)
     assert all(line.depth_test for line in mesh)
     assert all(line.z_index == 1 for line in mesh)
-    assert mesh.parallel(0).data["stroke_width"][0] == 8.0
+    assert mesh.parallel(0).data["stroke_width"][0] == OVERLAY_WIDTH
     xray = earth.graticule(30, see_through=True, follow=False)
     assert all(not line.depth_test for line in xray)
     assert all(line.z_index == 1 for line in xray)
@@ -601,6 +608,18 @@ def test_the_mesh_stops_at_the_globe():
     assert earth.label(23.8, 90.4, "X", font_size=18).depth_test
     assert earth.terminator().depth_test
     assert not earth.marker(0, 0, see_through=True).depth_test
+
+    # one width for every hugging stroke, the named circles heavier,
+    # the axis an X-ray guide (notes 2.14)
+    # the arc flies rather than hugs -- no leak measured at its
+    # light width (notes 2.14); the hugging family carries OVERLAY_WIDTH
+    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1), follow=False)
+    assert arc.data["stroke_width"][0] == 2.0
+    assert earth.equator().data["stroke_width"][0] == (
+        OVERLAY_WIDTH * SPECIAL_WIDTH_FACTOR)
+    axis = earth.axis_line(follow=False)
+    assert not axis.depth_test and axis.z_index == 1
+    assert axis.updaters
 
 
 def test_any_line_of_the_mesh_can_be_picked_up():

@@ -171,9 +171,19 @@ draw until asked.
 | **Cause 1** | `ThreeDScene.add` force-applies the depth test to every mobject it is handed, so an X-ray grid had its `depth_test` flag flipped back on the moment it was added. The freedom lasted until the add. |
 | **Cause 2** | The draw order of equal-`z_index` mobjects is not stable between renders: the same two-globe scene drew its passes as globe–grid–globe in one render and globe–globe–grid in the next (instrumented with a spy on `draw_pass`). A depth-tested overlay only occludes when its body's depth is already in the buffer, so the look could change from render to render. |
 | **Cause 3** | A perpendicular stroke only holds at the depth test once it is a few pixels wide. At the mesh's old width (1.6) the far side sails through whatever the flags say: one mixed grid measured 3,154 pixels against a 2,670 alone-reference, *more* with a globe in the way than without. At width 3 it half-leaks (0.61 of the reference), at width 10 it holds (0.46). The clip planes are no way round it either: the clip distance is evaluated at the stroke ribbon's corners, and a hugging circle's miter shift carries those corners across any horizon plane — a hand-built meridian ring kept 97% of its pixels through a clip that should have taken half, at every width tried. Re-measured on 2026-10-04, this time on the delivered API itself — a magenta `graticule(30)` on a plain radius-2.4 globe at the demo framing (frame 8.6, reorient −18/66, 720p) — the curve is gentler than the hand-built probe suggested: the occluded grid keeps 0.496 of its X-ray self at width 3, 0.471 at 4, 0.453 at 5, 0.449 at 6, 0.444 at 7 and 0.441–0.445 at 8–12. The asymptote, 0.443, is the near hemisphere itself, so the leak is the excess over it: +5.3% of the curve's pixels at 3, +2.8% at 4, +1.0% at 5, +0.6% at 6, +0.1% at 7. The floor moves with the framing — the hand-built probe read worse at its own — so a default wants a margin above the knee, and under spin plus a drifting camera widths 5 and 6 held their counts to 0.6% and 1.3% over 3 s. |
-| **Fix** | Three props in `_apply_occlusion`: every overlay takes `z_index=1` so it always draws after its body whatever order the renderer assembles; the X-ray variant carries an updater that re-states `depth_test=False` every frame, outlasting the scene's force-apply (`clear_updaters()` takes manual control back); and the grid lines default to width 8, wide enough for the depth test to mean it. |
+| **Fix** | Three props in `_apply_occlusion`: every overlay takes `z_index=1` so it always draws after its body whatever order the renderer assembles; the X-ray variant carries an updater that re-states `depth_test=False` every frame, outlasting the scene's force-apply (`clear_updaters()` takes manual control back); and the grid lines default to a width wide enough for the depth test to mean it — 8 at first, eased to 6 once the fine ladder of 2.14 found the floor. |
 | **Measure** | Two renders each, identical pixel for pixel: occluded 28,668, X-ray 62,095 (ratio 0.46); and under spin plus a drifting camera the occluded count holds at 28,713–29,053 across 3 s. The fill overlays (markers, labels) need no width — squares behind the globe were hidden at any size. |
-| **Guard** | `test_the_mesh_stops_at_the_globe` — flags, `z_index`, width 8 and the surviving updater. |
+| **Guard** | `test_the_mesh_stops_at_the_globe` — flags, `z_index`, the width constant and the surviving updater. |
+
+### 2.14 One width for every hugging line
+
+| | |
+| --- | --- |
+| **Symptom** | The hugging strokes wore four widths at once: the graticule family 8, the equator 2.2, the arc 2, the axis 3. The depth test only holds from about 5 up, and the equator had been leaking its far side all along — 0.555 of its X-ray self at 2.2 against 0.429 at 8.4, same framing, same magenta-dominant counting. |
+| **Cause** | The width law of 2.13 was written for the grid and never propagated; every earlier call kept the width it was born with. |
+| **Fix** | One constant, `OVERLAY_WIDTH = 6` — the measured floor is 5, the margin covers other framings — on `graticule`, `latitude_line`, `meridian_line` and `terminator`. The named circles (equator, tropics, polar circles, and the grid's own specials) run `SPECIAL_WIDTH_FACTOR` (1.4×) heavier, gold. `axis_line` stays thin and becomes an X-ray guide on purpose: it is a gauge, not geography, and an honestly hidden axis shows only its two tips — 399 pixels against 2032 X-ray — hiding exactly the half you want to watch. |
+| **Acquittal** | `arc_between` was charged with the same leak and cleared: it flies above the surface, and only its endpoints hug. An arc laid wholly on the far side measured 0.000 of its X-ray self at width 2 and 0.000 at 6; an arc crossing the horizon measured 0.844 at 2 against 0.892 at 6. No shine-through at its light width, so it keeps 2.0 — pressed flat with `height=0` it becomes a hugging stroke and wants `OVERLAY_WIDTH`, and the docstring says so. |
+| **Guard** | `test_the_mesh_stops_at_the_globe` — width 6 on the grid, 8.4 on the equator and the tropics, 2.0 on the arc, and the axis's depth-off flag with its updater. |
 
 ---
 
@@ -211,6 +221,9 @@ draw until asked.
 | Saturn flattening | 0.098 — the globe really is a tenth shorter pole to pole |
 | `graticule(30)` | 17 lines — 5 parallels, 12 meridians, radius 3.002–3.012 |
 | occlusion probe | width 8, one globe: 28,668 blue pixels occluded, 62,095 through (`see_through=True`) |
+| width ladder (API, demo framing) | 3 → 0.50 · 4 → 0.47 · 5 → 0.45 · 6 → 0.45 · 8–12 → 0.44 of the X-ray self; leak over the 0.443 asymptote: +5.3% at 3, +1.0% at 5, +0.6% at 6 |
+| equator, before and after | 2.2 → 0.555 (leaking); 8.4 → 0.429 (holds) — same framing, magenta-dominant counting |
+| axis, X-ray against honest | 2032 px against 399: the guide shows its buried middle, the honest axis only its two tips |
 | Earth g cross-check | G·M/R² from the table matches the quoted 9.80 to within 0.02 |
 
 Tests: `python tests/test_astro.py` — 46 checks, about 40 s (the first run

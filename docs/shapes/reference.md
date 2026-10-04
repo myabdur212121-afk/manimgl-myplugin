@@ -128,6 +128,22 @@ meeting at an edge often need different texture coordinates there.
 
 ---
 
+## Defaults
+
+| where | default | why |
+| --- | --- | --- |
+| `revolve` segments | 96 | smooth silhouette at video scale; raise it for close-ups |
+| `from_surface` weld | `True` | shared corners fuse — a cube is one connected mesh, not six patches |
+| `extrude` caps | auto | open paths get ends, closed paths do not |
+| `MeshData.weld` tol | 1e-5 | same position, same vertex — UVs are never merged |
+| `circle_profile` sides | 32 | round at this scale; `polygon_profile` when you want facets |
+| `polygon_profile` | 6 sides, radius 1 | the hexagon is the default prism |
+| `star_profile` | 5 points, inner 0.45 | the five-pointed star everyone means |
+| `semicircle_profile` samples | 48 | a sphere outline with no visible corner |
+| `helix_path` | 4 turns, radius 1, pitch 0.35 | a spring that reads as one |
+
+---
+
 ## Two things that will catch you
 
 **`height` is the z extent.** Sizing a torus or a bowl with `height=` blows

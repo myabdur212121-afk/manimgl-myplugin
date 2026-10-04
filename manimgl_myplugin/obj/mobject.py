@@ -195,7 +195,7 @@ class OBJMobject(Surface):
         subdivide: int = 0,
         smooth_subdivide: bool = True,
         displace: str | bool | None = None,
-        displace_strength: float = 0.04,
+        displace_strength: float = 0.05,   # same number as MeshData.displace
         vertex_func: Callable | None = None,
         depth_test: bool = True,
         cache: bool = True,

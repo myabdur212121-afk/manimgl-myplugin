@@ -61,10 +61,9 @@ class Geography(ThreeDScene):
         f.set_height(14).reorient(-20, 76, 0)
         earth = Earth(radius=2.2).spin(0.5)
         moon = Moon(radius=0.7).spin(0.15).orbit(earth, radius=5.2, period=9, tilt=12)
-        pin = earth.axis_line()
-        pin.add_updater(lambda m: m.become(earth.axis_line()))
+        earth.axis_line()      # X-ray guide: the pole, riding along
         code = self.hud("moon.orbit(earth, radius=5.2, period=9, tilt=12)")
         note = self.hud("both spinning on their own axes", corner=UL,
                         size=19, color=INK)
-        self.add(earth, moon, pin, code, note)
+        self.add(earth, moon, code, note)
         self.wait(11)

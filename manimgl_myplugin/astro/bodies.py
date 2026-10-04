@@ -71,6 +71,17 @@ def _apply_occlusion(mob, see_through: bool):
 #: both a blue planet and a red one.
 GOLD_MARKER = "#F2B33D"
 
+#: One width for every stroke that hugs the surface and has to be
+#: hidden behind it. The depth test only bites on a stroke a few
+#: pixels wide -- thinner, and the far side shines through whatever
+#: the flags say. The measured floor is 5; 6 keeps a margin for
+#: other framings (notes 2.13, 2.14).
+OVERLAY_WIDTH = 6.0
+
+#: The named circles are the feature, so they run visibly heavier
+#: than the plain grid around them.
+SPECIAL_WIDTH_FACTOR = 1.4
+
 #: How far out the Solar System Scope ring strip reaches, in planet radii.
 #: The image covers the whole system from the inner D ring to the outer A.
 RING_TEXTURE_SPAN = (1.11, 2.27)
@@ -576,7 +587,11 @@ class Body(Group):
 
         Each point is a great-circle step pushed out by a sine bump, so the
         line leaves and lands flat and rises in the middle -- a flight path
-        rather than a chord through the planet.
+        rather than a chord through the planet. The default width is
+        light on purpose: the arc flies above the surface, where the
+        depth test has nothing against it; press it flat with
+        ``height=0`` and it becomes a hugging stroke that wants
+        ``OVERLAY_WIDTH``.
 
         ``follow`` (the default) grafts the arc into the body so it rides
         along with every shift, rotate, spin and orbit. ``color`` and
@@ -598,6 +613,10 @@ class Body(Group):
         lift = self.radius * (1 + height * np.sin(np.pi * t))
         arc = VMobject().set_points_smoothly(
             self.get_center() + path * lift[:, None])
+        # it flies, not hugs: two probes measured no leak at this
+        # width (notes 2.14), and a light line reads as a route rather
+        # than geography. Pressed flat with height=0 it becomes a
+        # hugging stroke -- then it wants OVERLAY_WIDTH.
         arc.set_stroke(kwargs.pop("color", GOLD_MARKER),
                        kwargs.pop("width", 2.0), **kwargs)
         _apply_occlusion(arc, see_through)
@@ -606,7 +625,8 @@ class Body(Group):
         return arc
 
     def graticule(self, step=30, *, lat_step=None, lon_step=None,
-                  color="#8FE8FF", width: float = 8.0, height: float = 0.004,
+                  color="#8FE8FF", width: float = OVERLAY_WIDTH,
+                  height: float = 0.004,
                   highlight=None, highlight_color=None,
                   labels: bool = False, label_font_size: int = 20,
                   label_lon: float = 25.0, follow: bool = True,
@@ -642,10 +662,12 @@ class Body(Group):
         the depth test does not eat them, ``follow`` grafts them into the
         body like :meth:`marker`, and ``see_through=True`` keeps the
         far side shining through the globe -- the X-ray view, the
-        whole cage at once. The default width, 8, is fat by manim
+        whole cage at once. The default width, 6, is fat by manim
         standards and deliberately so: this renderer only holds a
         stroke at the depth test once it is a few pixels wide, and a
-        thin grid leaks its far side (notes 2.13). ``**kwargs`` reach
+        thin grid leaks its far side (notes 2.13); the floor was
+        measured at 5, and the margin covers other framings (notes
+        2.14). ``**kwargs`` reach
         ``set_stroke``.
         """
         if isinstance(step, (tuple, list)):
@@ -682,7 +704,8 @@ class Body(Group):
             line = self.latitude_line(
                 lat, height=height, follow=False, see_through=see_through,
                 color=highlight_color if is_special(lat) else color,
-                width=width * 1.4 if is_special(lat) else width, **kwargs)
+                width=width * SPECIAL_WIDTH_FACTOR if is_special(lat)
+                else width, **kwargs)
             parallels.append(line)
             if is_special(lat):
                 specials.append(line)
@@ -710,7 +733,8 @@ class Body(Group):
             self.add(*parallels, *meridians)
         return _apply_occlusion(mesh, see_through)
 
-    def latitude_line(self, lat: float, *, color="#8FE8FF", width: float = 8.0,
+    def latitude_line(self, lat: float, *, color="#8FE8FF",
+                      width: float = OVERLAY_WIDTH,
                       height: float = 0.004, samples: int = 181,
                       follow: bool = True, see_through: bool = False,
                       **kwargs) -> VMobject:
@@ -730,7 +754,8 @@ class Body(Group):
             self.add(line)
         return _apply_occlusion(line, see_through)
 
-    def meridian_line(self, lon: float, *, color="#8FE8FF", width: float = 8.0,
+    def meridian_line(self, lon: float, *, color="#8FE8FF",
+                      width: float = OVERLAY_WIDTH,
                       height: float = 0.004, samples: int = 181,
                       follow: bool = True, see_through: bool = False,
                       **kwargs) -> VMobject:
@@ -751,7 +776,7 @@ class Body(Group):
     def equator(self, **kwargs) -> VMobject:
         """Latitude zero, highlighted by default."""
         kwargs.setdefault("color", GOLD_MARKER)
-        kwargs.setdefault("width", 2.2)
+        kwargs.setdefault("width", OVERLAY_WIDTH * SPECIAL_WIDTH_FACTOR)
         return self.latitude_line(0.0, **kwargs)
 
     def tropics(self, **kwargs) -> VGroup:
@@ -760,7 +785,8 @@ class Body(Group):
         solstice -- at the body's own axial tilt, 23.44 degrees for Earth.
         A body with no tilt has no tropics, so its equator stands in.
         """
-        kwargs.setdefault("color", "#F2B33D")
+        kwargs.setdefault("color", GOLD_MARKER)
+        kwargs.setdefault("width", OVERLAY_WIDTH * SPECIAL_WIDTH_FACTOR)
         t = abs(self.tilt)
         if t < 1e-6:
             return VGroup(self.equator(**kwargs))
@@ -774,13 +800,15 @@ class Body(Group):
         in.
         """
         kwargs.setdefault("color", "#7E93AC")
+        kwargs.setdefault("width", OVERLAY_WIDTH * SPECIAL_WIDTH_FACTOR)
         t = abs(self.tilt)
         if 90.0 - t < 1e-6:
             return VGroup(self.equator(**kwargs))
         return VGroup(self.latitude_line(90.0 - t, **kwargs),
                       self.latitude_line(-(90.0 - t), **kwargs))
 
-    def terminator(self, light=None, *, color="#8FE8FF", width: float = 8.0,
+    def terminator(self, light=None, *, color="#8FE8FF",
+                   width: float = OVERLAY_WIDTH,
                    samples: int = 192, follow: bool = True,
                    see_through: bool = False, **kwargs) -> VMobject:
         """
@@ -822,14 +850,22 @@ class Body(Group):
         return line
 
     def axis_line(self, overhang: float = 1.4, color=GOLD_MARKER,
-                  width: float = 0.03) -> Line:
+                  width: float = 0.03, follow: bool = True) -> Line:
         """
         The pole, drawn -- the quickest way to see whether a spin is right.
+
+        A guide, not geography: X-ray on purpose, so the buried middle
+        stays visible while you watch a spin. ``follow`` (the default)
+        grafts it into the body like every other overlay, and it rides
+        along with every shift, tilt and orbit.
         """
         arm = self.axis * self.radius * overhang
         centre = self.get_center()
         line = Line(centre - arm, centre + arm)
         line.set_stroke(color, width * 100)
+        _apply_occlusion(line, True)
+        if follow:
+            self.add(line)
         return line
 
     # ------------------------------------------------- pinned overlays --
@@ -991,7 +1027,10 @@ class Body(Group):
         1 south-east, 2 north-east, 3 north-west -- and what comes back is
         ``VGroup(Tex label, small arc)`` ready for ``self.play``. The Tex
         names the corner (``P_2``) and, unless ``coords=False``, quotes its
-        own latitude and longitude. ``**kwargs`` reach the ``Tex``.
+        own latitude and longitude. ``**kwargs`` reach the ``Tex``. The
+        ring is callout-sized and thin; at that scale the depth test
+        does not reliably hide a stroke, so a corner near the limb may
+        show a faint ghost -- the note is meant for the near side.
         """
         from manimlib.mobject.svg.tex_mobject import Tex
 

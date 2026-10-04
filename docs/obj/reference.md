@@ -147,6 +147,26 @@ Assembles the model out of its own triangles. `order` can be an axis,
 
 ---
 
+## Defaults
+
+| where | default | why |
+| --- | --- | --- |
+| `up_axis` | `"y"` | the OBJ convention; CAD exports say `"z"` |
+| `center` | `True` | a model belongs where you are looking, not where its author left it |
+| `depth_test` | `True` | a solid model should hide its own back |
+| `dedupe` | `"auto"` | the z-fighting guard, on whenever coincident faces exist |
+| `decimate` / `subdivide` / `displace` | off | the mesh ships as authored — reshaping is a decision |
+| `displace_strength` | 0.05 | the same number as `MeshData.displace` — one idea, one value |
+| `shading` | (0.25, 0.3, 0.4) | manimgl's own triad |
+| `opacity` | 1.0 | models are solid by intent; glass is a choice |
+| `wireframe` width | 1.0 | the whole cage is the point — thin wires do not hold at the depth test |
+| `point_cloud` | 4000 points | dense enough to read as a surface, cheap enough to animate |
+| `legend` font size | 16 | a key, not a headline |
+| `BuildMesh` order / spread | `"z"` / 0.7 | one layer at a time; tiles pulled near, never through each other (spread is clipped below 0.98) |
+| `load_mesh` cache | `True` | a fetched file is immutable — the network is paid once |
+
+---
+
 ## Fixing files that are wrong
 
 Real exports are messy. Three problems came up often enough to handle

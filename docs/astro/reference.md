@@ -200,10 +200,16 @@ for almost everything else. The switch is more than a flag (this
 renderer has three ways to hide a line, see notes 2.13): the overlay
 draws after its body because it asks for the turn with `z_index`,
 an X-ray overlay re-states its freedom every frame so that
-`ThreeDScene.add` cannot take it back, and the grid lines are drawn
-at width 8 because a thin stroke slips past the depth test in this
-build. `clear_updaters()` on a returned X-ray mobject takes back
-manual control.
+`ThreeDScene.add` cannot take it back, and every hugging stroke is
+drawn at `OVERLAY_WIDTH` (6) because a thin stroke slips past the
+depth test in this build — the measured floor is 5, and the margin
+covers other framings (notes 2.14). The named circles run
+`SPECIAL_WIDTH_FACTOR` (1.4×) heavier, gold. Two deliberate
+exceptions: `arc_between` keeps a light 2.0 — it flies above the
+surface, and no leak was measured there — and `axis_line` is a thin
+X-ray guide, so the buried middle of the pole stays visible while
+you watch a spin. `clear_updaters()` on a returned X-ray mobject
+takes back manual control.
 
 The API system is: **a call builds, returns a mobject, and the work
 happens on that mobject with ordinary manim.** Parameters exist only
@@ -283,6 +289,39 @@ Mars(radius=3, dem="megt90n000eb.img", exaggeration=25)
 
 Olympus Mons is 0.65% of Mars' radius, so at true scale there is nothing to
 see; `exaggeration` is there to be honest about that rather than hide it.
+
+---
+
+## Defaults
+
+Every default is one of two kinds: a measured one, which changes only
+with a new measurement, or a taste one, which stays the same across
+the whole family. The rule for both is the same — the default is what
+you write when you are explaining to someone and do not want to stop
+and choose.
+
+| where | default | why |
+| --- | --- | --- |
+| `Body` radius | 3.0 | one globe fills a default frame |
+| quality | `"2k"` | sharp at video scale; 8k for close-ups |
+| resolution | (192, 96) | outline and shading only — the texture is per pixel |
+| shadows, strength | on, 0.85 | the ring shadows are what make Saturn read as Saturn |
+| exaggeration | 20.0 | true relief is 0.65% of Mars' radius — invisible |
+| `graticule` step | 30° | the SurfaceMesh spacing; 17 lines on a globe |
+| grid colour | `#8FE8FF` | ice blue, reads over ocean and land alike |
+| grid height | 0.004 | clear of the texture, close enough to hug |
+| hugging line width | 6 = `OVERLAY_WIDTH` | the depth-test floor (5) plus margin — notes 2.14 |
+| named circles | gold, 1.4× the width | the named circle is the feature |
+| `arc_between` width | 2.0 | it flies, not hugs — no leak measured at 2.0 |
+| `arc_between` height | 0.22 | leaves and lands flat, rises mid-way |
+| `marker` size / height | 0.05 / 0.01 | a dot, not a moon; clear of the ground |
+| `label` height / buff | 0.10 / 0.02 | far enough off the surface to read |
+| `cell_note` ring | radius 0.10, width 2 | a callout, deliberately small and light |
+| `axis_line` | thin, X-ray | a gauge, not geography — the buried half is the point |
+| `follow` | `True` | overlays ride with the body — the common case |
+| `see_through` | `False` | the honest look; the X-ray is asked for |
+| `spin` rate | 0.3 rad/s | a slow, readable turn |
+| `orbit` period | 12 s | one unhurried lap |
 
 ---
 
