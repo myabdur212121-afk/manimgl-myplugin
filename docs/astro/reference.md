@@ -163,6 +163,7 @@ earth.label(23.8, 90.4, "Dhaka")                  # readable text at a place
 earth.cell_note(23.8, 90.4, index=2)              # name a grid cell corner
 earth.place_on_surface(tag, 23.8, 90.4)           # bend a flat thing on
 earth.surface_text("DHAKA", 23.8, 90.4)           # ...the short form
+earth.meridian_line(90.4)                         # one line of longitude
 
 earth.equator(); earth.tropics(); earth.polar_circles()
 earth.terminator(light)                           # the day/night line
@@ -190,6 +191,23 @@ detached behaviour — you position it yourself. Anything grafted after
 construction is remembered, and `earth.shed_overlays()` takes the lot
 back off — handy between acts of a scene, where a `FadeOut` hides an
 overlay but leaves it in the family.
+
+Every surface overlay also takes `see_through=False`. The default is
+the honest look: a line that has gone round the back of the globe is
+hidden by it. `see_through=True` keeps the whole cage shining
+through — useful when the *point* is that a globe is a cage, wrong
+for almost everything else. The switch is more than a flag (this
+renderer has three ways to hide a line, see notes 2.13): the overlay
+draws after its body because it asks for the turn with `z_index`,
+an X-ray overlay re-states its freedom every frame so that
+`ThreeDScene.add` cannot take it back, and the grid lines are drawn
+at width 8 because a thin stroke slips past the depth test in this
+build. `clear_updaters()` on a returned X-ray mobject takes back
+manual control.
+
+The API system is: **a call builds, returns a mobject, and the work
+happens on that mobject with ordinary manim.** Parameters exist only
+for what your hand cannot reach once you hold the mobject.
 
 `label(lat, lon, text, ...)` pins **readable** text to a place: the
 position tracks the body through every move, and the text re-uprights on
@@ -226,11 +244,23 @@ projection distortion shows, as it does on any flat map. With
 `graticule` is the same idea as ManimGL's `SurfaceMesh`, for a globe: a
 plain mesh of blue lines with nothing special about any of them, drawn
 from the body's geometry so it works on **every** body — textured or
-not. It takes a tuple step `graticule((20, 40))`. The special circles
-wait off stage: `highlight` brings the equator, tropics and poles on in
-their own colour (`highlight=True` takes all three; a named circle is
-drawn even when the step would miss it — no round step lands on
-23.44°), and `labels=True` pins readable latitude tags.
+not. It takes a tuple step `graticule((20, 40))`, and hands back a
+`Graticule` — a mobject, so one line is picked up by hand:
+
+```python
+mesh = earth.graticule(30)
+mesh.parallel(60).set_stroke(YELLOW, 4)     # any one parallel
+mesh.meridian(90).set_stroke(YELLOW, 4)     # any one meridian
+```
+
+`mesh.parallel(lat)` raises `ValueError` for an angle the grid does not
+carry, and the message points at `latitude_line`/`meridian_line`, which
+draw any angle on their own. The special circles are parameters
+*because they are not on the grid to pick up*: `highlight` brings the
+equator, tropics and poles on in their own colour (`highlight=True`
+takes all three; a named circle is drawn even when the step would miss
+it — no round step lands on 23.44°), and `labels=True` pins readable
+latitude tags.
 
 `equator`, `tropics` and `polar_circles` as their own calls sit at the
 body's own tilt — Earth's tropics land at ±23.44° — and on a body with

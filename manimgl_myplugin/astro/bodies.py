@@ -40,6 +40,33 @@ __all__ = ["Body", "RingBand", "Mercury", "Venus", "Earth", "Moon", "Mars",
 #: ManimGL's own default light position, so a body looks right with no setup.
 DEFAULT_LIGHT = np.array([-10.0, 10.0, 10.0])
 
+
+def _apply_occlusion(mob, see_through: bool):
+    """
+    Overlays default to the honest look: the body hides them once
+    they go round the back. The depth test does that hiding, but it
+    needs two props to hold in this renderer (see notes 2.13): the
+    overlay draws after the body, which it asks for with ``z_index``
+    because the draw order of equal-index mobjects is not stable
+    between renders, and an X-ray overlay re-states its freedom every
+    frame, because ``ThreeDScene.add`` force-applies the depth test
+    to whatever it is handed. ``clear_updaters()`` on the returned
+    mobject takes that back for manual control.
+    """
+    mob.set_z_index(1)
+    if see_through:
+        mob.deactivate_depth_test()
+
+        def stay_through(m, dt):
+            for sm in m.get_family():
+                sm.depth_test = False
+
+        for sm in mob.get_family():
+            sm.add_updater(stay_through)
+    else:
+        mob.apply_depth_test()
+    return mob
+
 #: Markers and guide lines default to this, so they read against
 #: both a blue planet and a red one.
 GOLD_MARKER = "#F2B33D"
@@ -512,7 +539,8 @@ class Body(Group):
 
     def marker(self, lat: float, lon: float, color=GOLD_MARKER,
                size: float = 0.05, height: float = 0.01,
-               follow: bool = True, **kwargs) -> DotCloud:
+               follow: bool = True, see_through: bool = False,
+               **kwargs) -> DotCloud:
         """
         A dot pinned to a place on the surface.
 
@@ -531,13 +559,14 @@ class Body(Group):
         dot = DotCloud([self.point_at(lat, lon, height)],
                        radius=size * self.radius / 3.0, **kwargs)
         dot.set_color(color)
+        _apply_occlusion(dot, see_through)
         if follow:
             self.add(dot)
         return dot
 
     def arc_between(self, start, end, height: float = 0.22,
                     samples: int = 80, follow: bool = True,
-                    **kwargs) -> VMobject:
+                    see_through: bool = False, **kwargs) -> VMobject:
         """
         The short way round between two places, lifted into an arc.
 
@@ -571,16 +600,17 @@ class Body(Group):
             self.get_center() + path * lift[:, None])
         arc.set_stroke(kwargs.pop("color", GOLD_MARKER),
                        kwargs.pop("width", 2.0), **kwargs)
+        _apply_occlusion(arc, see_through)
         if follow:
             self.add(arc)
         return arc
 
     def graticule(self, step=30, *, lat_step=None, lon_step=None,
-                  color="#8FE8FF", width: float = 1.6, height: float = 0.004,
+                  color="#8FE8FF", width: float = 8.0, height: float = 0.004,
                   highlight=None, highlight_color=None,
                   labels: bool = False, label_font_size: int = 20,
                   label_lon: float = 25.0, follow: bool = True,
-                  **kwargs) -> VGroup:
+                  see_through: bool = False, **kwargs) -> Graticule:
         """
         The lat/lon mesh over the body -- the same idea as ManimGL's
         ``SurfaceMesh``, for a globe: a plain grid of blue lines, with
@@ -590,7 +620,14 @@ class Body(Group):
 
         ::
 
-            self.play(ShowCreation(earth.graticule(30)))
+            mesh = earth.graticule(30)
+            self.add(earth, mesh)
+            self.play(ShowCreation(mesh))
+
+        The grid hands back a :class:`Graticule`, and that mobject
+        is where the work happens: ``mesh.parallel(60)`` and
+        ``mesh.meridian(90)`` pick out any one line, and from there
+        it is ordinary manim -- ``set_stroke``, ``animate``, anything.
 
         ``step`` is the spacing in degrees; give ``(lat_step, lon_step)``
         to space parallels and meridians differently. The special
@@ -603,7 +640,13 @@ class Body(Group):
         no round step lands on 23.44 degrees. ``labels=True`` tags every
         parallel with its latitude. Lines sit a hair above the surface so
         the depth test does not eat them, ``follow`` grafts them into the
-        body like :meth:`marker`, and ``**kwargs`` reach ``set_stroke``.
+        body like :meth:`marker`, and ``see_through=True`` keeps the
+        far side shining through the globe -- the X-ray view, the
+        whole cage at once. The default width, 8, is fat by manim
+        standards and deliberately so: this renderer only holds a
+        stroke at the depth test once it is a few pixels wide, and a
+        thin grid leaks its far side (notes 2.13). ``**kwargs`` reach
+        ``set_stroke``.
         """
         if isinstance(step, (tuple, list)):
             lat_step, lon_step = step
@@ -630,16 +673,19 @@ class Body(Group):
         def is_special(lat: float) -> bool:
             return any(abs(lat - k) < 1e-6 for k in special)
 
-        lines = VGroup()
+        parallels, specials = [], []
         drawn = []
 
         def add_parallel(lat: float):
             lat = round(float(lat), 6)
             drawn.append(lat)
-            lines.add(self.latitude_line(
-                lat, height=height, follow=False,
+            line = self.latitude_line(
+                lat, height=height, follow=False, see_through=see_through,
                 color=highlight_color if is_special(lat) else color,
-                width=width * 1.4 if is_special(lat) else width, **kwargs))
+                width=width * 1.4 if is_special(lat) else width, **kwargs)
+            parallels.append(line)
+            if is_special(lat):
+                specials.append(line)
 
         for lat in np.arange(-90.0 + lat_step, 90.0, lat_step):
             add_parallel(float(lat))
@@ -648,40 +694,59 @@ class Body(Group):
         for k in special:
             if not any(abs(k - p) < 1e-6 for p in drawn):
                 add_parallel(k)
-        for lon in np.arange(-180.0, 180.0, lon_step):
-            lats = np.linspace(-90.0, 90.0, 121)
-            line = VMobject().set_points_smoothly(self._points_at(
-                lats, np.full_like(lats, round(float(lon), 6)),
-                np.full_like(lats, height)))
-            line.set_stroke(color, width, **kwargs)
-            lines.add(line)
+        meridians = [self.meridian_line(
+                         lon, height=height, follow=False, color=color,
+                         width=width, see_through=see_through, **kwargs)
+                     for lon in np.arange(-180.0, 180.0, lon_step)]
 
-        out = VGroup(*lines)
+        mesh = Graticule(parallels, meridians, specials)
         if labels:
             for lat in drawn:
-                out.add(self._pinned_text(
+                mesh.add(self._pinned_text(
                     _lat_tag(lat, label_font_size,
                              highlight_color if is_special(lat) else color),
                     lat, label_lon, height=0.06, follow=follow))
         if follow:
-            self.add(*lines)
-        return out
+            self.add(*parallels, *meridians)
+        return _apply_occlusion(mesh, see_through)
 
-    def latitude_line(self, lat: float, *, color="#8FE8FF", width: float = 1.6,
+    def latitude_line(self, lat: float, *, color="#8FE8FF", width: float = 8.0,
                       height: float = 0.004, samples: int = 181,
-                      follow: bool = True, **kwargs) -> VMobject:
+                      follow: bool = True, see_through: bool = False,
+                      **kwargs) -> VMobject:
         """
         One circle of latitude, drawn on the surface and riding along with
-        the body. ``**kwargs`` reach ``set_stroke``.
+        the body. ``see_through=True`` lets it shine through the globe;
+        the default is the honest, occluded look. ``**kwargs`` reach
+        ``set_stroke``.
         """
         lons = np.linspace(-180.0, 180.0, samples)
         pts = self._points_at(np.full_like(lons, float(lat)), lons,
                               np.full_like(lons, height))
         line = VMobject().set_points_smoothly(pts)
+        line.lat = round(float(lat), 6)
         line.set_stroke(color, width, **kwargs)
         if follow:
             self.add(line)
-        return line
+        return _apply_occlusion(line, see_through)
+
+    def meridian_line(self, lon: float, *, color="#8FE8FF", width: float = 8.0,
+                      height: float = 0.004, samples: int = 181,
+                      follow: bool = True, see_through: bool = False,
+                      **kwargs) -> VMobject:
+        """
+        One line of longitude, pole to pole -- the partner of
+        :meth:`latitude_line`, same knobs, same behaviour.
+        """
+        lats = np.linspace(-90.0, 90.0, samples)
+        pts = self._points_at(lats, np.full_like(lats, float(lon)),
+                              np.full_like(lats, height))
+        line = VMobject().set_points_smoothly(pts)
+        line.lon = round(float(lon), 6)
+        line.set_stroke(color, width, **kwargs)
+        if follow:
+            self.add(line)
+        return _apply_occlusion(line, see_through)
 
     def equator(self, **kwargs) -> VMobject:
         """Latitude zero, highlighted by default."""
@@ -715,9 +780,9 @@ class Body(Group):
         return VGroup(self.latitude_line(90.0 - t, **kwargs),
                       self.latitude_line(-(90.0 - t), **kwargs))
 
-    def terminator(self, light=None, *, color="#8FE8FF", width: float = 1.8,
+    def terminator(self, light=None, *, color="#8FE8FF", width: float = 8.0,
                    samples: int = 192, follow: bool = True,
-                   **kwargs) -> VMobject:
+                   see_through: bool = False, **kwargs) -> VMobject:
         """
         The day-night line: the great circle whose points see the light on
         their horizon.
@@ -751,6 +816,7 @@ class Body(Group):
                                s * circle[:, 1] + c * circle[:, 2]], axis=-1)
         line = VMobject().set_points_smoothly(self.get_center() + circle)
         line.set_stroke(color, width, **kwargs)
+        _apply_occlusion(line, see_through)
         if follow:
             self.add(line)
         return line
@@ -813,7 +879,7 @@ class Body(Group):
 
     def label(self, lat: float, lon: float, text: str, *,
               height: float = 0.10, buff: float = 0.02, font: str | None = None,
-              follow: bool = True, **kwargs):
+              follow: bool = True, see_through: bool = False, **kwargs):
         """
         A piece of text pinned to a place, staying readable while the body
         moves or turns.
@@ -838,12 +904,13 @@ class Body(Group):
             mob = Text(text, **kwargs)
         else:
             mob = Text(text, font=font, **kwargs)
-        return self._pinned_text(mob, lat, lon, height=height, buff=buff,
-                                 follow=follow)
+        mob = self._pinned_text(mob, lat, lon, height=height, buff=buff,
+                                follow=follow)
+        return _apply_occlusion(mob, see_through)
 
     def place_on_surface(self, mob, lat: float, lon: float, *,
                          height: float = 0.015, scale: float = 1.0,
-                         follow: bool = True):
+                         follow: bool = True, see_through: bool = False):
         """
         Lay a flat mobject onto the surface at ``(lat, lon)``, bending it
         round the curvature as it goes.
@@ -879,13 +946,15 @@ class Body(Group):
             lons = lon + local[:, 0] / (r * coslat) * (180.0 / np.pi)
             hs = height + local[:, 2] / r
             sm.set_points(self._points_at(lats, lons, hs))
+        _apply_occlusion(mob, see_through)
         if follow:
             self.add(mob)
         return mob
 
     def surface_text(self, text: str, lat: float, lon: float, *,
                      height: float = 0.015, scale: float = 1.0,
-                     follow: bool = True, font: str | None = None, **kwargs):
+                     follow: bool = True, see_through: bool = False,
+                     font: str | None = None, **kwargs):
         """
         Text painted onto the surface, curving with it -- the convenience
         form of :meth:`place_on_surface`.
@@ -902,12 +971,14 @@ class Body(Group):
         else:
             mob = Text(text, font=font, **kwargs)
         return self.place_on_surface(mob, lat, lon, height=height,
-                                     scale=scale, follow=follow)
+                                     scale=scale, follow=follow,
+                                     see_through=see_through)
 
     def cell_note(self, lat: float, lon: float, index: int = 0, *,
                   step: float = 30, arc_radius: float = 0.10,
                   color=GOLD_MARKER, coords: bool = True,
-                  follow: bool = True, **kwargs) -> VGroup:
+                  follow: bool = True, see_through: bool = False,
+                  **kwargs) -> VGroup:
         """
         Name and ring one corner of the graticule cell a place falls in.
 
@@ -954,7 +1025,7 @@ class Body(Group):
 
         self._pinned_text(tag, clat, clon, height=0.02,
                           buff=arc_radius * self.radius / 1.2, follow=follow)
-        return VGroup(tag, ring)
+        return _apply_occlusion(VGroup(tag, ring), see_through)
 
     # ------------------------------------------------------------- motion --
 
@@ -1110,6 +1181,48 @@ class Body(Group):
         if f.note:
             lines.append(f"  note   : {f.note}")
         return "\n".join(lines)
+
+
+class Graticule(VGroup):
+    """
+    The lat/lon mesh as a mobject in its own right. Every line in it is
+    an ordinary ``VMobject``, so whatever you want done to one line --
+    highlight it, thicken it, animate it -- is done with manim's own
+    methods on the mobject the grid handed back.
+
+    ::
+
+        mesh = earth.graticule(30)
+        mesh.parallel(60).set_stroke(YELLOW, 4)     # one parallel
+        mesh.meridian(90).set_stroke(YELLOW, 4)     # one meridian
+
+    ``parallels``, ``meridians`` and ``specials`` hold the lines in
+    drawn order. ``parallel(lat)`` / ``meridian(lon)`` pick one by
+    angle, and raise ``ValueError`` for an angle this grid does not
+    carry -- the message names the standalone call that draws any
+    angle on its own.
+    """
+
+    def __init__(self, parallels=(), meridians=(), specials=(), **kwargs):
+        self.parallels = list(parallels)
+        self.meridians = list(meridians)
+        self.specials = list(specials)
+        super().__init__(*self.parallels, *self.meridians, **kwargs)
+
+    @staticmethod
+    def _pick(lines, angle, kind, at):
+        for line in lines:
+            if abs(at(line) - angle) < 1e-6:
+                return line
+        raise ValueError(
+            f"this grid carries no {kind} at {angle:g} degrees; "
+            f"{kind}_line({angle:g}) draws any angle on its own")
+
+    def parallel(self, lat: float) -> VMobject:
+        return self._pick(self.parallels, lat, "latitude", lambda l: l.lat)
+
+    def meridian(self, lon: float) -> VMobject:
+        return self._pick(self.meridians, lon, "longitude", lambda l: l.lon)
 
 
 def _lat_tag(lat: float, font_size: int, color) -> "Text":

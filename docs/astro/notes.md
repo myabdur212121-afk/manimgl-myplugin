@@ -146,6 +146,35 @@ family-aware reader; tests should use it too.
 A failed `Tex` compile is a hard error, not a fallback: worth remembering
 when a scene suddenly dies on a machine that rendered fine yesterday.
 
+### 2.12 A mesh that shone through the planet
+
+| | |
+| --- | --- |
+| **Symptom** | The graticule was visible from the far side: lines ran straight through the texture, as if the globe were glass. |
+| **Cause** | Painter's order. ManimGL draws mobjects in the order they were added, and the mesh is added after the globe — so it painted over the texture, back hemisphere and all. The globe had been writing depth all along (`OBJMobject` defaults `depth_test=True`); the lines simply never tested it. |
+| **Fix** | `apply_depth_test()` on the overlay, wrapped in one place: `_apply_occlusion`. Every surface overlay now defaults to the occluded, honest look and takes `see_through=True` for the X-ray view. |
+| **Guard** | `test_the_mesh_stops_at_the_globe` — the flag and the draw order on every line of the grid, plus marker, arc, label and terminator. |
+| **Correction** | The first proof quoted for this entry — 6,164 blue pixels before against 2,782 after — was not the depth test at all. That probe frame held two globes side by side, and the renderer had drawn the left grid between the two globes and the right grid after both (confirmed by instrumenting the draw passes), so the left half shone through for want of any globe depth to test against and the right half did not. The numbers measured the draw order, not the fix. What the fix really buys, measured properly after 2.13, is 28,668 blue pixels occluded against 62,095 X-ray at width 8 — the near hemisphere's wires and no more. |
+
+The same message carried the API rule that had been forming: **a call
+builds, returns a mobject, and the work happens on that mobject.**
+Highlighting one line of a grid is not a parameter — `mesh.parallel(60)`
+hands you the line and manim does the rest. Parameters stayed only for
+what the hand cannot reach: the named circles, which the grid does not
+draw until asked.
+
+### 2.13 Three ways this renderer hides a line — and the one it keeps
+
+| | |
+| --- | --- |
+| **Symptom** | After 2.12 the video still showed no difference between the honest mesh and `see_through=True`: the two acts measured 2,906 against 2,866 blue pixels, a ratio of 0.99. |
+| **Cause 1** | `ThreeDScene.add` force-applies the depth test to every mobject it is handed, so an X-ray grid had its `depth_test` flag flipped back on the moment it was added. The freedom lasted until the add. |
+| **Cause 2** | The draw order of equal-`z_index` mobjects is not stable between renders: the same two-globe scene drew its passes as globe–grid–globe in one render and globe–globe–grid in the next (instrumented with a spy on `draw_pass`). A depth-tested overlay only occludes when its body's depth is already in the buffer, so the look could change from render to render. |
+| **Cause 3** | A perpendicular stroke only holds at the depth test once it is a few pixels wide. At the mesh's old width (1.6) the far side sails through whatever the flags say: one mixed grid measured 3,154 pixels against a 2,670 alone-reference, *more* with a globe in the way than without. At width 3 it half-leaks (0.61 of the reference), at width 10 it holds (0.46). The clip planes are no way round it either: the clip distance is evaluated at the stroke ribbon's corners, and a hugging circle's miter shift carries those corners across any horizon plane — a hand-built meridian ring kept 97% of its pixels through a clip that should have taken half, at every width tried. |
+| **Fix** | Three props in `_apply_occlusion`: every overlay takes `z_index=1` so it always draws after its body whatever order the renderer assembles; the X-ray variant carries an updater that re-states `depth_test=False` every frame, outlasting the scene's force-apply (`clear_updaters()` takes manual control back); and the grid lines default to width 8, wide enough for the depth test to mean it. |
+| **Measure** | Two renders each, identical pixel for pixel: occluded 28,668, X-ray 62,095 (ratio 0.46); and under spin plus a drifting camera the occluded count holds at 28,713–29,053 across 3 s. The fill overlays (markers, labels) need no width — squares behind the globe were hidden at any size. |
+| **Guard** | `test_the_mesh_stops_at_the_globe` — flags, `z_index`, width 8 and the surviving updater. |
+
 ---
 
 ## 3. Directions that do not work
@@ -165,6 +194,7 @@ when a scene suddenly dies on a machine that rendered fine yesterday.
 | **Reading `get_points()` off a `Text`** | Empty — the glyphs hold the points. See 2.10. |
 | **`\degree` in a `Tex`** | Nothing in the stock preamble defines it. `^{\circ}`. |
 | **A camera-facing label** | A mobject does not know where the camera is. The label is an upright billboard on the tangent plane; that is the honest limit. |
+| **A `highlight_line`-style parameter for one grid line** | The grid hands back a mobject; `mesh.parallel(60).set_stroke(...)` already does it. Parameters only for what the hand cannot reach. |
 | **`np.arange(-180 + step, 180, step)` for meridians** | Drops the ±180 column — 16 lines at step 30 where the parallels promise 17. Start at −180: the duplicate is the seam, same as the mesh. |
 
 ---
@@ -180,9 +210,10 @@ when a scene suddenly dies on a machine that rendered fine yesterday.
 | ring shadow bake | ~0.6 s at 1024×512, cached by light direction |
 | Saturn flattening | 0.098 — the globe really is a tenth shorter pole to pole |
 | `graticule(30)` | 17 lines — 5 parallels, 12 meridians, radius 3.002–3.012 |
+| occlusion probe | width 8, one globe: 28,668 blue pixels occluded, 62,095 through (`see_through=True`) |
 | Earth g cross-check | G·M/R² from the table matches the quoted 9.80 to within 0.02 |
 
-Tests: `python tests/test_astro.py` — 42 checks, about 30 s (the first run
+Tests: `python tests/test_astro.py` — 46 checks, about 40 s (the first run
 downloads textures).
 
 ---

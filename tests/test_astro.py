@@ -19,6 +19,8 @@ from manimgl_myplugin.astro.data import BODIES, RingBand, texture_url  # noqa: E
 try:
     from manimgl_myplugin.astro import (Saturn, Mars, Moon, Earth, Venus,
                                     Jupiter, Uranus, Body, named)
+    from manimlib import Mobject, VMobject, YELLOW
+    from manimlib.mobject.types.dot_cloud import DotCloud
     HAVE_MANIMGL = True
 except Exception:                                           # pragma: no cover
     HAVE_MANIMGL = False
@@ -565,6 +567,116 @@ def test_the_mesh_covers_a_body_with_no_texture():
     assert np.allclose(np.asarray(grid[0].get_points()), before + [1, 0, 0],
                        atol=1e-6)                # and riding along
 
+
+
+def test_the_mesh_stops_at_the_globe():
+    """
+    The mesh used to shine through the whole planet -- painter's order
+    drew it over the texture, back hemisphere and all. The honest look
+    is the default now, and the X-ray is an option. Two props hold the
+    honest look in this renderer: the overlay asks for its turn after
+    the body with z_index (the draw order of equal-index mobjects is
+    not stable between renders), and an X-ray overlay re-states its
+    freedom every frame, because ThreeDScene.add force-applies the
+    depth test to whatever it is handed. The grid is drawn wide (8)
+    on purpose: thin strokes leak past the depth test, notes 2.13.
+    """
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    mesh = earth.graticule(30)
+    assert all(line.depth_test for line in mesh)
+    assert all(line.z_index == 1 for line in mesh)
+    assert mesh.parallel(0).data["stroke_width"][0] == 8.0
+    xray = earth.graticule(30, see_through=True, follow=False)
+    assert all(not line.depth_test for line in xray)
+    assert all(line.z_index == 1 for line in xray)
+    # the freedom survives ThreeDScene.add, which force-applies the
+    # depth test at add time; the updater puts it back every frame
+    assert any(line.updaters for line in xray)
+
+    # the other surface overlays carry the same switch, same default
+    assert earth.marker(23.8, 90.4).depth_test
+    assert earth.arc_between((23.8, 90.4), (51.5, -0.1)).depth_test
+    assert earth.label(23.8, 90.4, "X", font_size=18).depth_test
+    assert earth.terminator().depth_test
+    assert not earth.marker(0, 0, see_through=True).depth_test
+
+
+def test_any_line_of_the_mesh_can_be_picked_up():
+    """Highlighting one line is not a parameter -- it is manim on the
+    mobject the grid hands back."""
+    if _skip():
+        return
+    from manimgl_myplugin.astro.bodies import Graticule
+    earth = Earth(radius=3, shadows=False)
+    mesh = earth.graticule(30)
+    assert isinstance(mesh, Graticule)
+    assert len(mesh.parallels) == 5 and len(mesh.meridians) == 12
+    assert len(mesh) == 17
+
+    p60 = mesh.parallel(60)
+    m90 = mesh.meridian(90)
+    assert any(p60 is m for m in mesh)
+    assert any(m90 is m for m in mesh)
+    p60.set_stroke(YELLOW, 4)          # plain manim from here on
+
+    try:
+        mesh.parallel(23.44)
+        raise AssertionError("23.44 is on no round grid")
+    except ValueError as exc:
+        assert "latitude_line" in str(exc)
+
+    fancy = earth.graticule(30, highlight=True)
+    assert len(fancy) == 17 + 4
+    assert len(fancy.specials) == 5    # equator, both tropics, both circles
+
+
+def test_meridian_line_mirrors_latitude_line():
+    if _skip():
+        return
+    # tilt 0, so the pole really is z and the check can be analytic
+    earth = Earth(radius=3, tilt=0, shadows=False)
+    line = earth.meridian_line(90.4)
+    assert isinstance(line, VMobject)
+    assert any(line is m for m in earth.submobjects)   # grafted in
+    assert line.depth_test
+    assert not earth.meridian_line(0.0, see_through=True,
+                                   follow=False).depth_test
+
+    # every point sits on the 90.4E meridian: its azimuth matches the
+    # azimuth point_at itself uses for that longitude
+    ref = earth.point_at(0.0, 90.4) - earth.get_center()
+    ref_az = np.degrees(np.arctan2(ref[1], ref[0]))
+    pts = np.asarray(line.get_points())
+    lat = np.degrees(np.arcsin(np.clip(
+        (pts[:, 2] - earth.get_center()[2]) / earth.radius, -1, 1)))
+    az = np.degrees(np.arctan2(pts[:, 1] - earth.get_center()[1],
+                               pts[:, 0] - earth.get_center()[0]))
+    mid = np.abs(lat) < 85          # the poles themselves are on every lon
+    d = np.abs((az[mid] - ref_az + 180) % 360 - 180)
+    assert d.max() < 0.5                               # degrees of slack
+
+
+def test_every_overlay_hands_back_a_mobject():
+    """The API system: build with a call, then work on what came back."""
+    if _skip():
+        return
+    from manimgl_myplugin.astro.bodies import Graticule
+    from manimlib.mobject.types.dot_cloud import DotCloud
+    earth = Earth(radius=3, shadows=False)
+    outs = {
+        earth.marker(23.8, 90.4): DotCloud,
+        earth.arc_between((23.8, 90.4), (51.5, -0.1)): VMobject,
+        earth.graticule(30): Graticule,
+        earth.label(23.8, 90.4, "X", font_size=18): Mobject,
+        earth.terminator(): VMobject,
+        earth.latitude_line(60): VMobject,
+        earth.meridian_line(90): VMobject,
+        earth.equator(): VMobject,
+    }
+    for mob, kind in outs.items():
+        assert isinstance(mob, Mobject) and isinstance(mob, kind)
 
 def test_terminator_faces_the_light():
     if _skip():
