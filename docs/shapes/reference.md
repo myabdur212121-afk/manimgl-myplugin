@@ -71,6 +71,12 @@ resolution up the object. UVs run around in u and along the profile in v,
 the same layout an equirectangular map uses — convenient if you mean to
 `displace` the result with elevation data.
 
+The mesh closes with `segments + 1` columns, the last a duplicate of the
+first carrying `u = 1` — the standard texture seam. The result is closed
+in position but not edge-welded at the seam, and that is deliberate:
+welding it would break the texture wrap. `wrap_u` is therefore `False`
+on the built mesh.
+
 ### `extrude(path, profile, closed_path=False, caps=None)`
 
 Sweep a cross-section along a path — toothpaste from a nozzle.

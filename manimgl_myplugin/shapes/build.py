@@ -113,7 +113,11 @@ def revolve(profile, segments: int = 96, name: str = "revolve") -> MeshData:
 
     ``segments`` is how many steps go around. The profile's own length is
     the resolution up the object, so a 48-point profile at 96 segments gives
-    a 96 x 48 grid.
+    a 97 x 48 grid -- the last column sits exactly where the first one does,
+    but carries u = 1 rather than wrapping back to 0. Duplicating the seam
+    column is how .obj files close a texture: without it the last strip
+    interpolates u from ~0.99 down to 0, squeezing the whole map backwards
+    into one column-width -- the "slight gap" at the join.
 
     UVs run around in u and along the profile in v, which is the same layout
     an equirectangular map uses -- convenient if you mean to
@@ -123,19 +127,19 @@ def revolve(profile, segments: int = 96, name: str = "revolve") -> MeshData:
     if len(profile) < 2:
         raise ValueError("a profile needs at least two points")
 
-    theta = np.linspace(0, 2 * np.pi, segments, endpoint=False)
+    theta = np.linspace(0, 2 * np.pi, segments + 1)
     r, z = profile[:, 0], profile[:, 1]
     points = np.stack([
         np.outer(np.cos(theta), r),
         np.outer(np.sin(theta), r),
-        np.tile(z, (segments, 1)),
+        np.tile(z, (segments + 1, 1)),
     ], axis=-1)
 
-    uvs = np.stack(np.meshgrid(np.linspace(0, 1, segments, endpoint=False),
+    uvs = np.stack(np.meshgrid(np.linspace(0, 1, segments + 1),
                                np.linspace(0, 1, len(profile)),
                                indexing="ij"), axis=-1)
-    return _grid_mesh(points, uvs, segments, len(profile),
-                      wrap_u=True, name=name)
+    return _grid_mesh(points, uvs, segments + 1, len(profile),
+                      wrap_u=False, name=name)
 
 
 def extrude(path, profile, closed_path: bool = False,

@@ -45,13 +45,27 @@ def test_revolve_makes_a_sphere():
 
 
 def test_revolve_closes_around_the_axis():
-    """wrap_u joins the last column back to the first -- no open seam."""
+    """
+    The surface closes round the axis, and the texture runs unbroken over
+    the closure. The last column duplicates the first column's *positions*
+    while carrying u = 1 -- the .obj way of closing a UV seam. Before that,
+    the wrap made the last strip interpolate u from ~0.99 down to 0,
+    squeezing the whole map backwards into one column: the "slight gap at
+    the join" the eye kept catching, 92 triangles wide on a 96-segment
+    globe.
+    """
     mesh = revolve(semicircle_profile(1.0, 12), segments=16)
-    edges = np.sort(mesh.tri_v[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2), axis=1)
-    _, counts = np.unique(edges, axis=0, return_counts=True)
-    # a closed surface has every edge shared by two faces; the poles are the
-    # only exception and they are few
-    assert (counts == 2).mean() > 0.85, (counts == 2).mean()
+    nv = len(mesh.vertices) // 17                  # 17 columns now, not 16
+    first, last = mesh.vertices[:nv], mesh.vertices[-nv:]
+    assert np.allclose(first, last, atol=1e-6)     # geometrically closed
+
+    u = mesh.uvs[:, 0]
+    assert abs(u.max() - 1.0) < 1e-6               # the seam column is u = 1
+    tri_u = u[np.clip(mesh.tri_vt, 0, len(u) - 1)]
+    assert (tri_u.max(1) - tri_u.min(1)).max() < 0.5   # nothing wraps
+
+    # and the closure did not change the triangle count
+    assert mesh.num_faces == 16 * (12 - 1) * 2 - 32  # minus the pole quads
 
 
 def test_revolve_drops_the_degenerate_pole_quads():

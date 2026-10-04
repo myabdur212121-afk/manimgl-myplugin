@@ -79,6 +79,19 @@ This is the bug that justified prototyping before committing to the design.
 
 I hit this twice while making the demo. It is the single easiest mistake here.
 
+### 2.6 A seam test that failed a correct sphere
+
+| | |
+| --- | --- |
+| **Symptom** | `test_revolve_closes_around_the_axis` scored 0.8426 on shared edges — under its own 0.85 bar — on a sphere everyone agreed looked shut. |
+| **Cause** | The last column of vertices is a **deliberate duplicate** of the first, carrying `u = 1` where the first carries `u = 0`. That is how a `.obj` stores a texture wrap: the seam column is the price of the map going all the way round. The test demanded shared *edges*, which the duplicated column can never give — the test was measuring the wrong virtue. |
+| **Fix** | The geometry, not the test philosophy: `revolve` now builds `segments + 1` columns, ends the sweep at `u = 1` exactly, and passes `wrap_u=False` so the reader does not wrap a second time. The test was rewritten to what "closed" actually means: first and last vertex columns coincide to 1e-9, `u` reaches 1, no triangle's u-span crosses more than half the texture, and the face count is the full 320 for a 16-step profile. |
+| **Guard** | `test_revolve_closes_around_the_axis` — geometric closure and u continuity, not edge sharing. |
+
+The sphere is closed in position and open in topology, and both of those
+are correct at once. Do not weld the seam shut on a textured body: you
+would gain a shared edge and lose the wrap.
+
 ---
 
 ## 3. Directions that do not work
@@ -91,6 +104,7 @@ I hit this twice while making the demo. It is the single easiest mistake here.
 | **Welding UVs along with positions** | Two patches meeting at an edge usually need *different* texture coordinates there. `weld` merges positions only. |
 | **`extrude` with a two-point profile** | A profile is a closed loop; two points make a line, and the result is a degenerate ribbon. Refused. |
 | **Assuming `revolve` output is watertight** | It is closed around the axis, but a profile that does not start and end on the axis leaves the top and bottom open — a bowl really is a bowl. Add the closing points yourself if you want a solid. |
+| **Welding the texture seam shut** | The duplicated seam column is what makes the wrap work. Weld it and the map stops going all the way round. See 2.6. |
 
 ---
 
