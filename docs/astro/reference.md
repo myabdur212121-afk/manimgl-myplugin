@@ -166,7 +166,6 @@ earth.surface_text("DHAKA", 23.8, 90.4)           # ...the short form
 
 earth.equator(); earth.tropics(); earth.polar_circles()
 earth.terminator(light)                           # the day/night line
-earth.flat_map(height=3)                          # the map, unwrapped
 
 moon.orbit(earth, radius=5.2, period=9, tilt=12)
 moon.stop_orbit()
@@ -209,8 +208,8 @@ Keywords reach the `Tex`.
 
 Anything that builds a mobject for you passes its keywords through:
 `marker` → `DotCloud` (`radius`, `glow_factor`, `opacity`), `label` and
-`surface_text` → `Text`, `cell_note` → `Tex`, `flat_map` → `ImageMobject`,
-and the line-drawing calls → `set_stroke`.
+`surface_text` → `Text`, `cell_note` → `Tex`, and the line-drawing calls
+→ `set_stroke`.
 
 ### Painting on the surface
 
@@ -224,50 +223,23 @@ projection distortion shows, as it does on any flat map. With
 
 ### The named circles, and the terminator
 
-`equator`, `tropics` and `polar_circles` sit at the body's own tilt —
-Earth's tropics land at ±23.44° — and on a body with no tilt the tropics
-degenerate to the equator. `graticule` now takes a tuple step
-`graticule((20, 40))`, can `highlight` the equator, tropics and poles in
-its own colour (`highlight=True` takes all three; a named circle is
-drawn even when the step would miss it — no round step lands on 23.44°),
-and can pin latitude `labels` that stay readable.
+`graticule` is the same idea as ManimGL's `SurfaceMesh`, for a globe: a
+plain mesh of blue lines with nothing special about any of them, drawn
+from the body's geometry so it works on **every** body — textured or
+not. It takes a tuple step `graticule((20, 40))`. The special circles
+wait off stage: `highlight` brings the equator, tropics and poles on in
+their own colour (`highlight=True` takes all three; a named circle is
+drawn even when the step would miss it — no round step lands on
+23.44°), and `labels=True` pins readable latitude tags.
+
+`equator`, `tropics` and `polar_circles` as their own calls sit at the
+body's own tilt — Earth's tropics land at ±23.44° — and on a body with
+no tilt the tropics degenerate to the equator.
 
 `terminator(light)` draws the day/night line for a light at that scene
 point. It is exact for a **sphere**; on a flattened body like Saturn the
 line is drawn on the sphere of the equatorial radius, which is right at
 the equator and off by a fraction of a percent towards the poles.
-
-### `flat_map`
-
-```python
-earth.flat_map(height=3)                    # the day map, 2:1
-earth.flat_map(night=True, graticule=True)  # the night map, ruled
-```
-
-The equirectangular rectangle the globe was wrapped from, at its natural
-2:1. It works from a copy in the cache by default (`copy_texture=False`
-reads the original file instead), so later painting can never touch the
-download. A flat map is a separate mobject: it does not follow the body,
-and there is deliberately **no morph** between globe and map — a honest
-equirectangular morph needs a resample mid-way, which is a project of
-its own. Move it with the usual mobject methods.
-
-### `rings`
-
-```python
-Saturn(rings=False)
-Saturn(rings=[RingBand(1.2, 2.0, opacity=0.6, name="one")])
-```
-
-`RingBand(inner, outer, opacity, name)` — edges in planet radii, the way
-ring data is always quoted. Opacity stands in for optical depth.
-
-The Cassini Division is **not** a transparent patch of texture: B stops at
-1.951 and A starts at 2.027, so the gap is a real hole in the geometry.
-That matters, because the shader throws away fully transparent pixels but
-overwrites partial alpha with the per-vertex opacity — soft transparency
-from a texture does not survive. Ring colour and opacity are therefore
-sampled from the strip into the vertices instead.
 
 ### `dem`
 

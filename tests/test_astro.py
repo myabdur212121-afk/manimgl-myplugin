@@ -511,10 +511,10 @@ def test_graticule_highlight_and_labels():
     earth = Earth(radius=3, shadows=False)
     grid = earth.graticule(30)
     assert len(grid) == 17                       # 5 parallels + 12 meridians
+    # plain mesh by default now: no equator is slipped in when the step
+    # misses it -- that is what highlight= is for
     mixed = earth.graticule((20, 40), follow=False)
-    # 8 parallels at step 20, plus the equator the default highlight adds
-    # because no multiple of 20 lands on it, plus 9 meridians
-    assert len(mixed) == 9 + 9
+    assert len(mixed) == 8 + 9                   # 8 parallels, 9 meridians
 
     tagged = earth.graticule(30, labels=True)
     assert len(tagged) == 17 + 5                 # five pinned latitude tags
@@ -547,6 +547,25 @@ def test_tropics_and_polar_circles_sit_at_the_tilt():
     assert len(untilted.tropics()) == 1          # the equator stands in
 
 
+
+def test_the_mesh_covers_a_body_with_no_texture():
+    """The graticule is drawn from the body's geometry, not its texture,
+    so a plain Body -- tilted, textureless -- wears it just the same."""
+    if _skip():
+        return
+    rock = Body(radius=2, tilt=23.44)
+    grid = rock.graticule(30)
+    assert len(grid) == 17
+    pts = np.concatenate([np.asarray(sm.get_points()) for sm in grid])
+    r = np.linalg.norm(pts - rock.get_center(), axis=1)
+    assert 1.9 < r.min() and r.max() < 2.15      # hugging the surface
+
+    before = np.asarray(grid[0].get_points()).copy()
+    rock.shift([1.0, 0.0, 0.0])
+    assert np.allclose(np.asarray(grid[0].get_points()), before + [1, 0, 0],
+                       atol=1e-6)                # and riding along
+
+
 def test_terminator_faces_the_light():
     if _skip():
         return
@@ -560,19 +579,6 @@ def test_terminator_faces_the_light():
     assert np.abs(dots).max() < 0.05 * np.linalg.norm(d) * 3
     r = np.linalg.norm(pts - body.get_center(), axis=1)
     assert 2.9 < r.min() and r.max() < 3.1
-
-
-def test_flat_map_is_two_to_one_and_works_from_a_copy():
-    if _skip():
-        return
-    from manimgl_myplugin.obj.loader import CACHE_DIR
-    earth = Earth(radius=2, shadows=False)
-    fmap = earth.flat_map(height=2)
-    assert type(fmap[0]).__name__ == "ImageMobject"
-    assert abs(fmap[0].get_width() / fmap[0].get_height() - 2.0) < 0.05
-    assert (CACHE_DIR / "flatmap-2k_earth_daymap.jpg").exists()
-    ruled = earth.flat_map(height=2, graticule=True)
-    assert len(ruled) == 2                       # the image, then the grid
 
 
 def test_surface_text_curves_onto_the_globe():

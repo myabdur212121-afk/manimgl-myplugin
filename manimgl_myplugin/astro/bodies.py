@@ -577,25 +577,30 @@ class Body(Group):
 
     def graticule(self, step=30, *, lat_step=None, lon_step=None,
                   color="#8FE8FF", width: float = 1.6, height: float = 0.004,
-                  highlight=("equator",), highlight_color=None,
+                  highlight=None, highlight_color=None,
                   labels: bool = False, label_font_size: int = 20,
                   label_lon: float = 25.0, follow: bool = True,
                   **kwargs) -> VGroup:
         """
-        The lat/lon grid, for when the geometry needs explaining.
+        The lat/lon mesh over the body -- the same idea as ManimGL's
+        ``SurfaceMesh``, for a globe: a plain grid of blue lines, with
+        nothing special about any of them. It works on every body,
+        textured or not, because it is drawn from the body's own
+        geometry rather than from its texture.
 
         ::
 
             self.play(ShowCreation(earth.graticule(30)))
 
         ``step`` is the spacing in degrees; give ``(lat_step, lon_step)``
-        to space parallels and meridians differently. ``highlight`` names
-        the special circles to draw in ``highlight_color`` -- any of
-        ``"equator"``, ``"tropics"`` and ``"poles"`` (the polar circles);
+        to space parallels and meridians differently. The special
+        circles are **not** part of the look -- they wait off stage.
+        ``highlight`` brings them on, drawn in ``highlight_color``: any
+        of ``"equator"``, ``"tropics"`` and ``"poles"`` (the polar
+        circles), each at the body's *own* axial tilt;
         ``highlight=True`` takes all three, and a single string works
         too. A named circle is drawn even when the step would miss it --
-        no round step lands on 23.44 degrees.
-        each at the body's *own* axial tilt. ``labels=True`` tags every
+        no round step lands on 23.44 degrees. ``labels=True`` tags every
         parallel with its latitude. Lines sit a hair above the surface so
         the depth test does not eat them, ``follow`` grafts them into the
         body like :meth:`marker`, and ``**kwargs`` reach ``set_stroke``.
@@ -950,63 +955,6 @@ class Body(Group):
         self._pinned_text(tag, clat, clon, height=0.02,
                           buff=arc_radius * self.radius / 1.2, follow=follow)
         return VGroup(tag, ring)
-
-    def flat_map(self, height: float | None = None, *, graticule: bool = False,
-                 night: bool = False, step: float = 30,
-                 grid_color="#8FE8FF", grid_width: float = 1.2,
-                 copy_texture: bool = True, **kwargs) -> Group:
-        """
-        The body's own map, flat: the equirectangular rectangle the globe
-        was wrapped from, at its natural 2:1.
-
-        ::
-
-            earth = Earth(radius=2)
-            self.add(earth, earth.flat_map(height=3)
-                            .next_to(earth, RIGHT, buff=1))
-
-        ``graticule=True`` rules the lat/lon grid over it. ``night=True``
-        unwraps the night map instead of the day one. ``copy_texture`` (the
-        default) works from a copy in the cache so later painting can never
-        touch the downloaded original; pass ``False`` to read the original
-        file directly. ``**kwargs`` reach ``ImageMobject`` -- ``opacity``
-        and friends. A flat map does not follow the body; move it with the
-        usual mobject methods.
-        """
-        import shutil
-        from manimlib.mobject.types.image_mobject import ImageMobject
-
-        stem = self._night_stem if night else self._texture_stem
-        if stem is None:
-            raise ValueError(f"{self.facts.name} carries no texture, "
-                             "so there is no map to unwrap")
-        source = Path(self._fetch_texture(stem))
-        if copy_texture:
-            dest = CACHE_DIR / f"flatmap-{source.name}"
-            if not dest.exists() or source.stat().st_mtime > dest.stat().st_mtime:
-                CACHE_DIR.mkdir(parents=True, exist_ok=True)
-                shutil.copy(source, dest)
-            source = dest
-
-        if height is None:
-            height = np.pi * self.radius / 2      # half the equator's true length
-        img = ImageMobject(str(source), height=height, **kwargs)
-        # a plain Group: ImageMobject is no VMobject, so VGroup would refuse it
-        group = Group(img)
-
-        if graticule:
-            w, h = img.get_width(), img.get_height()
-            grid = VGroup()
-            for lat in np.arange(-90.0 + step, 90.0, step):
-                y = lat / 180.0 * h
-                grid.add(Line([-w / 2, y, 0], [w / 2, y, 0]))
-            for lon in np.arange(-180.0 + step, 180.0, step):
-                x = lon / 180.0 * w
-                grid.add(Line([x, -h / 2, 0], [x, h / 2, 0]))
-            grid.set_stroke(grid_color, grid_width)
-            grid.shift(0.01 * OUT)      # a hair off the image quad, or they fight
-            group.add(grid)
-        return group
 
     # ------------------------------------------------------------- motion --
 

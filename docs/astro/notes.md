@@ -161,7 +161,7 @@ when a scene suddenly dies on a machine that rendered fine yesterday.
 | **`rotate(OUT)` to spin a tilted body** | Precesses the pole. Use `spin()`. |
 | **Trusting lat/lon without checking the map** | The texture is half a turn round from the maths. Sample it. |
 | **Expecting relief at true scale** | Olympus Mons is 0.65% of Mars' radius. Without `exaggeration` there is nothing to see. |
-| **`VGroup` around an `ImageMobject`** | `flat_map` tried it; VGroup refuses non-VMobjects. Plain `Group`. |
+| **`VGroup` around an `ImageMobject`** | VGroup refuses non-VMobjects. Plain `Group`. |
 | **Reading `get_points()` off a `Text`** | Empty — the glyphs hold the points. See 2.10. |
 | **`\degree` in a `Tex`** | Nothing in the stock preamble defines it. `^{\circ}`. |
 | **A camera-facing label** | A mobject does not know where the camera is. The label is an upright billboard on the tangent plane; that is the honest limit. |
@@ -180,7 +180,6 @@ when a scene suddenly dies on a machine that rendered fine yesterday.
 | ring shadow bake | ~0.6 s at 1024×512, cached by light direction |
 | Saturn flattening | 0.098 — the globe really is a tenth shorter pole to pole |
 | `graticule(30)` | 17 lines — 5 parallels, 12 meridians, radius 3.002–3.012 |
-| `flat_map` | 2:1 exactly (2048×1024 source); copy lands in the cache as `flatmap-…` |
 | Earth g cross-check | G·M/R² from the table matches the quoted 9.80 to within 0.02 |
 
 Tests: `python tests/test_astro.py` — 42 checks, about 30 s (the first run
@@ -200,9 +199,11 @@ downloads textures).
 - **No rotation rates, no ephemeris.** `add_updater` and pick a speed.
 - **Gas giants have no elevation data** because they have no surface. That
   is not a gap in the helper.
-- **No globe↔map morph.** `flat_map` is the unwrapped map beside the
-  globe, full stop. An honest equirectangular morph needs a resample
-  mid-way; that is a project of its own, not a keyword.
+- **No flattening the globe into a map.** `flat_map()` was built — the
+  equirectangular unwrap at its true 2:1 — and then taken back out at
+  review: effects multiply, and an unused one is surface area that still
+  has to be maintained. When a scene needs a map, an image beside the
+  globe says the same thing with nothing to maintain.
 - **`terminator` is exact for a sphere only.** On a flattened body it is
   drawn on the sphere of the equatorial radius — right at the equator,
   a fraction of a percent off towards the poles.
