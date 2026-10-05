@@ -163,6 +163,8 @@ earth.label(23.8, 90.4, "Dhaka")                  # readable text at a place
 earth.cell_note(23.8, 90.4, index=2)              # name a grid cell corner
 earth.place_on_surface(tag, 23.8, 90.4)           # bend a flat thing on
 earth.surface_text("DHAKA", 23.8, 90.4)           # ...the short form
+earth.surface_tex(r"P_2", 30, 120)                # LaTeX, painted on
+earth.surface_point(23.8, 90.4)                   # paint, not a pin -- grows with the zoom
 earth.meridian_line(90.4)                         # one line of longitude
 
 earth.equator(); earth.tropics(); earth.polar_circles()
@@ -316,10 +318,12 @@ and choose.
 | named circles | gold, 1.4× the width | the named circle is the feature |
 | `arc_between` width | 2.0 | it flies, not hugs — no leak measured at 2.0 |
 | `arc_between` height | 0.22 | leaves and lands flat, rises mid-way |
+| `arc_between` edge dots | on -- gold `surface_marker`s | a journey names its two ends; `edge_dot=dict(...)` restyles them |
 | `marker` size / height | 0.10 / 0.01 | the `cell_note` ring's twin; clear of the ground |
 | `label` height / buff | 0.10 / 0.02 | far enough off the surface to read |
 | `cell_note` ring | radius 0.10, width 2 | a callout, deliberately small and light |
-| `axis_line` | thin, X-ray | a gauge, not geography — the buried half is the point |
+| `surface_point` / `surface_marker` | radius 0.10, the pin's scale | paint, not a pin -- real geometry, grows with the camera |
+| `axis_line` | thin, honest | the arms past the poles carry the story; `see_through=True` is the X-ray gauge |
 | `follow` | `True` | overlays ride with the body — the common case |
 | `see_through` | `False` | the honest look; the X-ray is asked for |
 | `spin` rate | 0.3 rad/s | a slow, readable turn |

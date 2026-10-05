@@ -204,6 +204,16 @@ draw until asked.
 | **Also** | The ring's stroke was a literal 2.0; it now reads `OVERLAY_WIDTH`, so a future width change cannot strand it. |
 | **Guard** | `test_marker_default_size_is_the_ring_scale`, `test_cell_note_ring_uses_the_family_width`. |
 
+### 2.17 The axis went honest, the terminator closed, and the surface grew a family
+
+| | |
+| --- | --- |
+| **Symptom** | Two things the Api video showed were called bugs. The axis line's buried middle shone through the globe -- 241 gold pixels inside the disc against 345 honest ones outside -- because `_apply_occlusion(line, True)` was hardcoded: the X-ray of 2.14 was the default with no way out. And the terminator did not close: `endpoint=False` sampling left its endpoints 0.098 units, 1.875 degrees, apart -- a ring with a notch. |
+| **Fix** | `axis_line` takes `see_through=False` like every other overlay: honest by default, X-ray on request. The terminator samples with the endpoint included, as the graticule's circles always did, so the last point lands on the first. |
+| **Family** | `place_on_surface` is the engine, untouched. On it: `surface_point` (a filled disc -- real geometry that grows with the camera, unlike `marker`'s screen-sized pin), `surface_marker` (the gold twin), `surface_tex` / `surface_mathtex` (LaTeX on the ground), `surface_cell_note` (a closed painted ring with a ground-curled tag -- the readable floating `cell_note` stays). |
+| **Arc** | `arc_between(edge_dot=True)` -- the default -- pins both ends with `surface_marker`s; a dict (`edge_dot=dict(color=..., size=...)`) reaches the dots, `False` gives the bare arc. With dots the return is the `VGroup(arc, dots)`. |
+| **Guard** | `test_terminator_closes_the_ring`, `test_axis_line_is_honest_by_default`, `test_surface_point_is_paint_not_a_pin`, `test_surface_tex_and_mathtex_bend_onto_the_globe`, `test_surface_cell_note_paints_a_closed_ring`, `test_arc_between_pins_its_two_ends`. |
+
 ---
 
 ## 3. Directions that do not work

@@ -362,10 +362,118 @@ def test_arc_between_leaves_the_surface_and_comes_back():
     if _skip():
         return
     earth = Earth(radius=3, shadows=False)
-    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1), height=0.25)
+    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1), height=0.25,
+                           edge_dot=False)
     r = np.linalg.norm(np.asarray(arc.get_points()) - earth.get_center(), axis=1)
     assert abs(r[0] - 3) < 0.15 and abs(r[-1] - 3) < 0.15   # flat at both ends
-    assert r.max() > 3.4                                     # and up in between
+    assert r.max() > 3.4                                # and up in between
+
+
+def test_arc_between_pins_its_two_ends():
+    """
+    Notes 2.17: the default journey is a VGroup of the arc and a
+    painted dot at each end; a dict reaches the dots' own parameters,
+    False gives the bare arc.
+    """
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    flight = earth.arc_between((23.8, 90.4), (51.5, -0.1))
+    assert len(flight.submobjects) == 3
+
+    def surface_radius(dot):
+        pts = np.concatenate([np.asarray(sm.get_points()) for sm
+                              in dot.get_family() if sm.has_points()])
+        return np.linalg.norm(pts - earth.get_center(), axis=1)
+
+    # paint sits on the ground: radius x (1 + height), height a fraction
+    assert np.allclose(surface_radius(flight[1]), 3 * 1.015, atol=0.01)
+    assert np.allclose(surface_radius(flight[2]), 3 * 1.015, atol=0.01)
+
+    bare = earth.arc_between((23.8, 90.4), (51.5, -0.1), edge_dot=False)
+    assert not bare.submobjects
+
+    def span(dot):
+        pts = np.concatenate([np.asarray(sm.get_points()) for sm
+                              in dot.get_family() if sm.has_points()])
+        return max(np.ptp(pts[:, i]) for i in range(3))
+
+    big = earth.arc_between((23.8, 90.4), (51.5, -0.1),
+                            edge_dot=dict(size=0.2))
+    assert span(big[1]) > span(flight[1])          # size was honoured
+
+
+def test_terminator_closes_the_ring():
+    """Notes 2.17: endpoint=False sampling left 1.875 degrees open."""
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    pts = np.asarray(earth.terminator(follow=False).get_points())
+    assert np.linalg.norm(pts[0] - pts[-1]) < 1e-9
+
+
+def test_axis_line_is_honest_by_default():
+    """
+    Notes 2.17: the buried middle used to shine through -- 241 gold
+    pixels of it inside the disc -- because the X-ray was hardcoded.
+    The honest look is the default; the X-ray is asked for.
+    """
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    axis = earth.axis_line(follow=False)
+    assert axis.depth_test and axis.z_index == 1 and not axis.updaters
+    xray = earth.axis_line(follow=False, see_through=True)
+    assert not xray.depth_test and xray.updaters
+    # and it still crosses the poles: every point on the body's axis,
+    # out to the overhang
+    ax = earth.axis / np.linalg.norm(earth.axis)
+    v = np.asarray(axis.get_points())
+    along = v @ ax
+    radial = np.linalg.norm(v - np.outer(along, ax), axis=1)
+    assert radial.max() < 1e-6
+    assert abs(np.abs(along).max() - 3 * 1.4) < 1e-6
+
+
+def test_surface_point_is_paint_not_a_pin():
+    """
+    Real geometry on the sphere: the disc rides at radius x (1 + height)
+    -- height is a fraction of the radius -- so the camera's zoom grows
+    and shrinks it, where marker's pin keeps a fixed screen size.
+    """
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    dot = earth.surface_point(23.8, 90.4, follow=False)
+    pts = np.concatenate([np.asarray(sm.get_points()) for sm
+                          in dot.get_family() if sm.has_points()])
+    r = np.linalg.norm(pts - earth.get_center(), axis=1)
+    assert np.allclose(r, 3 * 1.015, atol=0.01)
+    assert dot.get_fill_opacity() == 1.0         # paint, not an outline
+
+
+def test_surface_tex_and_mathtex_bend_onto_the_globe():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    for mob in (earth.surface_tex(r"day: $24\,$h", 0, 0, follow=False),
+                earth.surface_mathtex(r"\omega^2 r", 30, 120, follow=False)):
+        pts = np.concatenate([np.asarray(sm.get_points()) for sm
+                              in mob.get_family() if sm.has_points()])
+        r = np.linalg.norm(pts - earth.get_center(), axis=1)
+        assert np.allclose(r, 3 * 1.015, atol=0.01)
+
+
+def test_surface_cell_note_paints_a_closed_ring():
+    if _skip():
+        return
+    earth = Earth(radius=3, shadows=False)
+    note = earth.surface_cell_note(23.8, 90.4, index=2, follow=False)
+    ring_pts = np.asarray(note[1].get_points())
+    assert np.linalg.norm(ring_pts[0] - ring_pts[-1]) < 1e-9   # closed
+    r = np.linalg.norm(ring_pts - earth.get_center(), axis=1)
+    assert np.allclose(r, 3 * 1.015, atol=0.01)
+    assert note[0].submobjects                      # the P tag is there
 
 
 def test_graticule_and_axis_line_exist_and_sit_on_the_body():
@@ -483,7 +591,7 @@ def test_markers_and_arcs_follow_the_body():
         return
     earth = Earth(radius=3, shadows=False)
     dot = earth.marker(23.8, 90.4)
-    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1))
+    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1), edge_dot=False)
     d0 = np.asarray(dot.get_points()).copy()
     a0 = np.asarray(arc.get_points()).copy()
 
@@ -638,22 +746,24 @@ def test_the_mesh_stops_at_the_globe():
 
     # the other surface overlays carry the same switch, same default
     assert earth.marker(23.8, 90.4).depth_test
-    assert earth.arc_between((23.8, 90.4), (51.5, -0.1)).depth_test
+    assert earth.arc_between((23.8, 90.4), (51.5, -0.1))[0].depth_test
     assert earth.label(23.8, 90.4, "X", font_size=18).depth_test
     assert earth.terminator().depth_test
     assert not earth.marker(0, 0, see_through=True).depth_test
 
     # one width for every hugging stroke, the named circles heavier,
-    # the axis an X-ray guide (notes 2.14)
+    # the axis honest now, its X-ray asked for (notes 2.17)
     # the arc flies rather than hugs -- no leak measured at its
     # light width (notes 2.14); it matches the family default now
-    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1), follow=False)
+    arc = earth.arc_between((23.8, 90.4), (51.5, -0.1), follow=False,
+                            edge_dot=False)
     assert arc.data["stroke_width"][0] == 2.0
     assert earth.equator().data["stroke_width"][0] == (
         OVERLAY_WIDTH * SPECIAL_WIDTH_FACTOR)
     axis = earth.axis_line(follow=False)
-    assert not axis.depth_test and axis.z_index == 1
-    assert axis.updaters
+    assert axis.depth_test and axis.z_index == 1      # honest (2.17)
+    xray_axis = earth.axis_line(follow=False, see_through=True)
+    assert not xray_axis.depth_test and xray_axis.updaters
 
 
 def test_any_line_of_the_mesh_can_be_picked_up():

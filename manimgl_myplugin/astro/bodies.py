@@ -23,8 +23,8 @@ from pathlib import Path
 import numpy as np
 
 from manimlib.animation.rotation import Rotating
-from manimlib.constants import DEGREES, OUT, RIGHT, TAU
-from manimlib.mobject.geometry import Arc, Line
+from manimlib.constants import DEGREES, OUT, RIGHT, TAU, WHITE
+from manimlib.mobject.geometry import Arc, Circle, Line
 from manimlib.mobject.mobject import Group
 from manimlib.mobject.types.dot_cloud import DotCloud
 from manimlib.mobject.types.vectorized_mobject import VGroup, VMobject
@@ -582,7 +582,8 @@ class Body(Group):
 
     def arc_between(self, start, end, height: float = 0.22,
                     samples: int = 80, follow: bool = True,
-                    see_through: bool = False, **kwargs) -> VMobject:
+                    see_through: bool = False,
+                    edge_dot: bool | dict = True, **kwargs) -> VMobject:
         """
         The short way round between two places, lifted into an arc.
 
@@ -603,6 +604,12 @@ class Body(Group):
         along with every shift, rotate, spin and orbit. ``color`` and
         ``width`` name the two common stroke settings; anything else in
         ``**kwargs`` reaches ``set_stroke``.
+
+        ``edge_dot`` (the default ``True``) pins the journey's two ends
+        with :meth:`surface_marker` dots, and the result is the
+        ``VGroup(arc, start dot, end dot)``. A dict reaches the dots'
+        own parameters -- ``edge_dot=dict(color=RED, size=0.14)`` --
+        and ``False`` gives the bare arc.
         """
         p0 = self.point_at(*start) - self.get_center()
         p1 = self.point_at(*end) - self.get_center()
@@ -627,9 +634,19 @@ class Body(Group):
         arc.set_stroke(kwargs.pop("color", GOLD_MARKER),
                        kwargs.pop("width", 2.0), **kwargs)
         _apply_occlusion(arc, see_through)
+        if not edge_dot:
+            if follow:
+                self.add(arc)
+            return arc
+        # the journey's two ends, pinned on the ground; a dict in
+        # edge_dot carries the dots' own parameters
+        dot_kw = dict(edge_dot) if isinstance(edge_dot, dict) else {}
+        dots = [self.surface_marker(*place, follow=False, **dot_kw)
+                for place in (start, end)]
+        flight = VGroup(arc, *dots)
         if follow:
-            self.add(arc)
-        return arc
+            self.add(flight)
+        return flight
 
     def graticule(self, step=30, *, lat_step=None, lon_step=None,
                   color="#8FE8FF", width: float = OVERLAY_WIDTH,
@@ -838,7 +855,9 @@ class Body(Group):
         e1 = helper - d * (helper @ d)
         e1 = e1 / max(np.linalg.norm(e1), 1e-12)
         e2 = np.cross(d, e1)
-        th = np.linspace(0, TAU, samples, endpoint=False)
+        # endpoint included, so the last sample lands on the first and
+        # the ring closes -- the graticule's circles always did this
+        th = np.linspace(0, TAU, samples)
         circle = self.radius * (np.outer(np.cos(th), e1) + np.outer(np.sin(th), e2))
         circle[:, 2] *= self._polar_scale()
 
@@ -856,20 +875,23 @@ class Body(Group):
         return line
 
     def axis_line(self, overhang: float = 1.4, color=GOLD_MARKER,
-                  width: float = 0.03, follow: bool = True) -> Line:
+                  width: float = 0.03, follow: bool = True,
+                  see_through: bool = False) -> Line:
         """
         The pole, drawn -- the quickest way to see whether a spin is right.
 
-        A guide, not geography: X-ray on purpose, so the buried middle
-        stays visible while you watch a spin. ``follow`` (the default)
-        grafts it into the body like every other overlay, and it rides
-        along with every shift, tilt and orbit.
+        Honest by default: the globe hides the buried middle, and only
+        the two arms stick out past the poles. ``see_through=True`` is
+        the X-ray gauge -- the whole line visible through the body, for
+        watching a spin from the side. ``follow`` (the default) grafts
+        it into the body like every other overlay, and it rides along
+        with every shift, tilt and orbit.
         """
         arm = self.axis * self.radius * overhang
         centre = self.get_center()
         line = Line(centre - arm, centre + arm)
         line.set_stroke(color, width * 100)
-        _apply_occlusion(line, True)
+        _apply_occlusion(line, see_through)
         if follow:
             self.add(line)
         return line
@@ -1015,6 +1037,110 @@ class Body(Group):
         return self.place_on_surface(mob, lat, lon, height=height,
                                      scale=scale, follow=follow,
                                      see_through=see_through)
+
+    def surface_point(self, lat: float, lon: float, *, color=WHITE,
+                      size: float = 0.10, height: float = 0.015,
+                      scale: float = 1.0, follow: bool = True,
+                      see_through: bool = False, **kwargs):
+        """
+        A dot painted on the ground at ``(lat, lon)`` -- a filled disc
+        bent round the curvature by :meth:`place_on_surface`.
+
+        ``marker`` is a pin: drawn at a fixed screen size, readable at
+        any distance. This one is paint: real geometry on the sphere,
+        growing and shrinking with the camera exactly as the ground
+        does. ``size`` is the disc's radius, on the same ``x radius/3``
+        scale as ``marker`` and the ``cell_note`` ring, so pin, paint
+        and ring read as one size. ``**kwargs`` reach the ``Circle``.
+        """
+        dot = Circle(radius=size * self.radius / 3.0, **kwargs)
+        dot.set_fill(color, opacity=1.0)
+        dot.set_stroke(width=0)
+        return self.place_on_surface(dot, lat, lon, height=height,
+                                     scale=scale, follow=follow,
+                                     see_through=see_through)
+
+    def surface_marker(self, lat: float, lon: float, *, color=GOLD_MARKER,
+                       size: float = 0.10, height: float = 0.015,
+                       scale: float = 1.0, follow: bool = True,
+                       see_through: bool = False, **kwargs):
+        """
+        ``surface_point`` in the marker's gold -- the twin pin, painted
+        on the ground instead of floating at a fixed screen size.
+        ``**kwargs`` reach the ``Circle``.
+        """
+        return self.surface_point(lat, lon, color=color, size=size,
+                                  height=height, scale=scale,
+                                  follow=follow,
+                                  see_through=see_through, **kwargs)
+
+    def surface_tex(self, tex: str, lat: float, lon: float, *,
+                    height: float = 0.015, scale: float = 1.0,
+                    follow: bool = True, see_through: bool = False,
+                    **kwargs):
+        """
+        A LaTeX label painted on the surface, curving with it -- the
+        ``TexText`` form of :meth:`surface_text`, so words and inline
+        mathematics share one line (``"day: $24\\,$h"``).
+        ``**kwargs`` reach ManimGL's ``TexText``.
+        """
+        from manimlib.mobject.svg.tex_mobject import TexText
+        return self.place_on_surface(TexText(tex, **kwargs), lat, lon,
+                                     height=height, scale=scale,
+                                     follow=follow,
+                                     see_through=see_through)
+
+    def surface_mathtex(self, tex: str, lat: float, lon: float, *,
+                        height: float = 0.015, scale: float = 1.0,
+                        follow: bool = True, see_through: bool = False,
+                        **kwargs):
+        """
+        Pure mathematics painted on the surface -- ManimGL's ``Tex``,
+        which is math mode by design. ``**kwargs`` reach the ``Tex``.
+        """
+        from manimlib.mobject.svg.tex_mobject import Tex
+        return self.place_on_surface(Tex(tex, **kwargs), lat, lon,
+                                     height=height, scale=scale,
+                                     follow=follow,
+                                     see_through=see_through)
+
+    def surface_cell_note(self, lat: float, lon: float, index: int = 0, *,
+                          step: float = 30, size: float = 0.10,
+                          color=GOLD_MARKER, coords: bool = True,
+                          height: float = 0.015, follow: bool = True,
+                          see_through: bool = False, **kwargs):
+        """
+        ``cell_note``'s all-decal twin: a **closed** gold ring painted
+        around the grid-cell corner, with the ``P`` tag curved onto the
+        ground inside it. Everything bends with the planet. The trade:
+        ground-curled text reads best when the corner faces the camera,
+        where the floating ``cell_note`` tag is readable from anywhere.
+        ``**kwargs`` reach the ``Tex`` tag.
+        """
+        step = float(step)
+        lat0 = np.floor(lat / step) * step
+        lon0 = np.floor((lon + 180.0) / step) * step - 180.0
+        i = int(index) % 4
+        clat, clon = [(lat0, lon0), (lat0, lon0 + step),
+                      (lat0 + step, lon0 + step),
+                      (lat0 + step, lon0)][i]
+        # ^{\circ}, not \degree: the stock preamble defines no \degree,
+        # and a failed Tex compile is a hard error
+        where = (rf"\,({clat:.0f}^{{\circ}},\,{clon:.0f}^{{\circ}})"
+                 if coords else "")
+        ring = Circle(radius=size * self.radius / 3.0)
+        ring.set_stroke(color, OVERLAY_WIDTH)
+        ring.set_fill(opacity=0.0)
+        self.place_on_surface(ring, clat, clon, height=height,
+                              follow=False, see_through=see_through)
+        kwargs.setdefault("font_size", 30)
+        tag = self.surface_mathtex(rf"P_{{{i}}}" + where, clat, clon,
+                               height=height, follow=False,
+                               see_through=see_through, **kwargs)
+        note = VGroup(tag, ring)
+        if follow:
+            self.add(note)
+        return note
 
     def cell_note(self, lat: float, lon: float, index: int = 0, *,
                   step: float = 30, arc_radius: float = 0.10,
