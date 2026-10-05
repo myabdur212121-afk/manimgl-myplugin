@@ -563,9 +563,11 @@ class Body(Group):
         Lifted very slightly off the ground by default, or the depth test
         leaves it half buried in the texture. The default size is the
         :meth:`cell_note` ring's, so a dot and a ring on one globe read
-        as one family. The dot is drawn at a fixed screen size, so it
-        stays readable however close the camera comes -- a pin, not
-        a ball.
+        as one family. The dot is a billboard: it faces the camera, so
+        it reads as a round pin at any angle. It is still real
+        geometry, so it grows and shrinks with the zoom like
+        anything on the globe -- for a mark that lies flat on the
+        ground instead, see :meth:`surface_point`.
 
         ``follow`` (the default) grafts the dot into the body, so shifting,
         rotating, :meth:`spin` or :meth:`orbit` all carry it along at no
@@ -1046,10 +1048,11 @@ class Body(Group):
         A dot painted on the ground at ``(lat, lon)`` -- a filled disc
         bent round the curvature by :meth:`place_on_surface`.
 
-        ``marker`` is a pin: drawn at a fixed screen size, readable at
-        any distance. This one is paint: real geometry on the sphere,
-        growing and shrinking with the camera exactly as the ground
-        does. ``size`` is the disc's radius, on the same ``x radius/3``
+        ``marker`` is a pin: a billboard dot, always facing the camera,
+        so it stays round at any angle. This one is paint: a disc
+        lying on the ground, so the camera's tilt foreshortens it
+        and the curvature curls it -- it reads as part of the
+        surface, not a thing hovering above it. ``size`` is the disc's radius, on the same ``x radius/3``
         scale as ``marker`` and the ``cell_note`` ring, so pin, paint
         and ring read as one size. ``**kwargs`` reach the ``Circle``.
         """
@@ -1065,8 +1068,8 @@ class Body(Group):
                        scale: float = 1.0, follow: bool = True,
                        see_through: bool = False, **kwargs):
         """
-        ``surface_point`` in the marker's gold -- the twin pin, painted
-        on the ground instead of floating at a fixed screen size.
+        ``surface_point`` in the marker's gold -- the pin's twin, painted
+        flat on the ground instead of facing the camera.
         ``**kwargs`` reach the ``Circle``.
         """
         return self.surface_point(lat, lon, color=color, size=size,

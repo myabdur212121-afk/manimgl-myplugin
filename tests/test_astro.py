@@ -439,7 +439,8 @@ def test_surface_point_is_paint_not_a_pin():
     """
     Real geometry on the sphere: the disc rides at radius x (1 + height)
     -- height is a fraction of the radius -- so the camera's zoom grows
-    and shrinks it, where marker's pin keeps a fixed screen size.
+    and shrinks it; the pin is a camera-facing billboard, the paint
+    is a disc lying on the ground.
     """
     if _skip():
         return

@@ -210,9 +210,20 @@ draw until asked.
 | --- | --- |
 | **Symptom** | Two things the Api video showed were called bugs. The axis line's buried middle shone through the globe -- 241 gold pixels inside the disc against 345 honest ones outside -- because `_apply_occlusion(line, True)` was hardcoded: the X-ray of 2.14 was the default with no way out. And the terminator did not close: `endpoint=False` sampling left its endpoints 0.098 units, 1.875 degrees, apart -- a ring with a notch. |
 | **Fix** | `axis_line` takes `see_through=False` like every other overlay: honest by default, X-ray on request. The terminator samples with the endpoint included, as the graticule's circles always did, so the last point lands on the first. |
-| **Family** | `place_on_surface` is the engine, untouched. On it: `surface_point` (a filled disc -- real geometry that grows with the camera, unlike `marker`'s screen-sized pin), `surface_marker` (the gold twin), `surface_tex` / `surface_mathtex` (LaTeX on the ground), `surface_cell_note` (a closed painted ring with a ground-curled tag -- the readable floating `cell_note` stays). |
+| **Family** | `place_on_surface` is the engine, untouched. On it: `surface_point` (a filled disc lying on the ground), `surface_marker` (the gold twin), `surface_tex` / `surface_mathtex` (LaTeX on the ground), `surface_cell_note` (a closed painted ring with a ground-curled tag -- the readable floating `cell_note` stays). |
 | **Arc** | `arc_between(edge_dot=True)` -- the default -- pins both ends with `surface_marker`s; a dict (`edge_dot=dict(color=..., size=...)`) reaches the dots, `False` gives the bare arc. With dots the return is the `VGroup(arc, dots)`. |
 | **Guard** | `test_terminator_closes_the_ring`, `test_axis_line_is_honest_by_default`, `test_surface_point_is_paint_not_a_pin`, `test_surface_tex_and_mathtex_bend_onto_the_globe`, `test_surface_cell_note_paints_a_closed_ring`, `test_arc_between_pins_its_two_ends`. |
+
+---
+
+### 2.18 The pin was never screen-fixed -- a promise withdrawn
+
+| | |
+| --- | --- |
+| **Symptom** | `marker`'s docstring promised "drawn at a fixed screen size". Filming the Api2 zoom beat disproved it. A controlled probe (DotCloud radius 0.1, no globe, frame heights 8.6 / 3.0 / 1.4, 720p) measured the dot at 12, 44 and 100 px wide -- world-scaled, exactly as the `true_dot.wgsl` vertex shader says it must be (`radius` is in world units; the quad corners are `center ± radius`). The 2.16 ladder measured px at one framing only, so the promise was never tested until now. |
+| **Could it be fixed?** | Not from the plugin. An updater that compensates for frame height needs the camera, and this manimlib gives mobjects no route to it (no `mob.scene`, no registry; the scene calls `update_mobjects(dt)` with nothing but time). Patching manimlib's shader or reading the caller's stack are both outside the rules. Withdrawn, not fixed. |
+| **What is true instead** | The pin is a *billboard*: camera-facing, so it stays a round dot at any angle (probe: 44x44 px at frame 3.0) while `surface_point`'s paint, lying on the ground, foreshortens with the tilt (44x15 px, same framing). Both grow with the zoom, as real things do. The Api2 zoom beat now tells that story. |
+| **Fix** | Docstrings of `marker`, `surface_point` and `surface_marker` and the 2.17 row re-told truthfully; `test_surface_point_is_paint_not_a_pin`'s prose no longer claims a fixed screen size. No behaviour changed. |
 
 ---
 
