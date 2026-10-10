@@ -913,6 +913,39 @@ def test_cell_note_names_the_right_corner():
     assert d.mean() > 0.05
 
 
+def test_colour_reaches_the_glyph_fills():
+    """
+    manimlib's Text/Tex take ``color`` to Pango but the glyph fills come
+    back white -- measured while filming BnCurve, when a gold word came
+    out grey (notes 2.19). Every text route in the plugin now carries
+    ``color`` over with ``set_fill``, and this holds it there.
+    """
+    if _skip():
+        return
+    from manimlib import Circle
+    gold = "#F2B33D"
+    wanted = Circle().set_fill(gold, opacity=1.0).uniforms["fill_rgba"]
+
+    earth = Earth(radius=3, shadows=False)
+    routes = (
+        earth.surface_text("X", 0, 0, color=gold, follow=False),
+        earth.surface_tex("day $t$", 0, 0, color=gold, follow=False),
+        earth.surface_mathtex(r"\omega", 0, 0, color=gold, follow=False),
+        earth.label(0, 0, "X", color=gold, follow=False),
+    )
+    for mob in routes:
+        got = mob[0].uniforms["fill_rgba"]
+        assert np.allclose(got, wanted, atol=1e-3), (mob, got, wanted)
+
+    # the graticule's little value tags ride the same road
+    grid = earth.graticule(30, labels=True)
+    for sub in grid:
+        for sm in sub.get_family():
+            if type(sm).__name__ == "Text" and sm.has_points():
+                assert not np.allclose(
+                    sm.uniforms["fill_rgba"][:3], 1.0, atol=1e-3)
+
+
 def main():
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]

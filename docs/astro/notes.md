@@ -227,6 +227,17 @@ draw until asked.
 
 ---
 
+### 2.19 Text colour never reached the glyph fills
+
+| | |
+| --- | --- |
+| **Symptom** | Filming BnCurve, a `Text(color="#F2B33D")` word came out grey-white. A 2D control frame settled it: every Text/Tex/TexText glyph carries `fill_rgba = [1,1,1,1]` whatever `color` says, while a `Rectangle` with the same colour renders gold. `Text` hands `color` to Pango as the `foreground` markup attribute, and the colour does not come back from the SVG into the mobject's fill. |
+| **Blast radius** | Every coloured caption in every video so far: the Api2 code HUDs probe at 0 cyan and 1,430 white px in their own corner -- the "house palette" was quietly monochrome. It passed unnoticed because the palette is near-white to begin with, and the gold things we measured (axis, rings, marker pins) are strokes or DotClouds, which do take colour. |
+| **Fix** | `_colour_text` in bodies.py: if `color` is in the kwargs, say it again with `set_fill` after construction. Applied at seven sites: `label`, `surface_text`, `surface_tex`, `surface_mathtex`, `cell_note`'s tag, `_lat_tag`, and through them `surface_cell_note`'s tag. `surface_cell_note`'s own `color` parameter stays the ring's, as documented; the tag takes colour through `**kwargs` (`fill_color=` reaches it directly). |
+| **Guard** | `test_colour_reaches_the_glyph_fills` -- four routes plus the graticule's value tags, asserting the glyph fill rgba equals what `set_fill` would give. |
+
+---
+
 ## 3. Directions that do not work
 
 | Idea | Why it fails |

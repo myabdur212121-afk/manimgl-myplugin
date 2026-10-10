@@ -970,8 +970,8 @@ class Body(Group):
             mob = Text(text, **kwargs)
         else:
             mob = Text(text, font=font, **kwargs)
-        mob = self._pinned_text(mob, lat, lon, height=height, buff=buff,
-                                follow=follow)
+        mob = self._pinned_text(_colour_text(mob, kwargs), lat, lon,
+                                height=height, buff=buff, follow=follow)
         return _apply_occlusion(mob, see_through)
 
     def place_on_surface(self, mob, lat: float, lon: float, *,
@@ -1036,8 +1036,9 @@ class Body(Group):
             mob = Text(text, **kwargs)
         else:
             mob = Text(text, font=font, **kwargs)
-        return self.place_on_surface(mob, lat, lon, height=height,
-                                     scale=scale, follow=follow,
+        return self.place_on_surface(_colour_text(mob, kwargs), lat, lon,
+                                     height=height, scale=scale,
+                                     follow=follow,
                                      see_through=see_through)
 
     def surface_point(self, lat: float, lon: float, *, color=WHITE,
@@ -1088,10 +1089,10 @@ class Body(Group):
         ``**kwargs`` reach ManimGL's ``TexText``.
         """
         from manimlib.mobject.svg.tex_mobject import TexText
-        return self.place_on_surface(TexText(tex, **kwargs), lat, lon,
-                                     height=height, scale=scale,
-                                     follow=follow,
-                                     see_through=see_through)
+        return self.place_on_surface(
+            _colour_text(TexText(tex, **kwargs), kwargs), lat, lon,
+            height=height, scale=scale, follow=follow,
+            see_through=see_through)
 
     def surface_mathtex(self, tex: str, lat: float, lon: float, *,
                         height: float = 0.015, scale: float = 1.0,
@@ -1102,10 +1103,10 @@ class Body(Group):
         which is math mode by design. ``**kwargs`` reach the ``Tex``.
         """
         from manimlib.mobject.svg.tex_mobject import Tex
-        return self.place_on_surface(Tex(tex, **kwargs), lat, lon,
-                                     height=height, scale=scale,
-                                     follow=follow,
-                                     see_through=see_through)
+        return self.place_on_surface(
+            _colour_text(Tex(tex, **kwargs), kwargs), lat, lon,
+            height=height, scale=scale, follow=follow,
+            see_through=see_through)
 
     def surface_cell_note(self, lat: float, lon: float, index: int = 0, *,
                           step: float = 30, size: float = 0.10,
@@ -1181,7 +1182,7 @@ class Body(Group):
         # \degree, and a failed Tex compile is a hard error
         where = (rf"\,({clat:.0f}^{{\circ}},\,{clon:.0f}^{{\circ}})"
                  if coords else "")
-        tag = Tex(rf"P_{{{i}}}" + where, **kwargs)
+        tag = _colour_text(Tex(rf"P_{{{i}}}" + where, **kwargs), kwargs)
 
         # a three-quarter ring in the tangent plane at the corner, facing
         # out of the surface
@@ -1399,11 +1400,25 @@ class Graticule(VGroup):
         return self._pick(self.meridians, lon, "longitude", lambda l: l.lon)
 
 
+def _colour_text(mob, kwargs):
+    """
+    ManimGL's Text/Tex carry ``color`` to Pango but not back from it: the
+    glyph fills come out white whatever colour was asked for (measured in
+    notes 2.19 -- every coloured caption in the early videos was quietly
+    monochrome). Saying it with ``set_fill`` instead makes ``color=`` do
+    what it says without taking anything away from ``**kwargs``.
+    """
+    if "color" in kwargs:
+        mob.set_fill(kwargs["color"])
+    return mob
+
+
 def _lat_tag(lat: float, font_size: int, color) -> "Text":
     """The little value tag ``graticule(labels=True)`` pins to a parallel."""
     from manimlib.mobject.svg.text_mobject import Text
-    return Text(f"{round(lat)}\N{DEGREE SIGN}", font_size=font_size,
-                color=color)
+    return _colour_text(
+        Text(f"{round(lat)}\N{DEGREE SIGN}", font_size=font_size,
+             color=color), {"color": color})
 
 
 def _preset(key: str) -> type:
