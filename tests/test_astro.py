@@ -18,7 +18,8 @@ from manimgl_myplugin.astro.data import BODIES, RingBand, texture_url  # noqa: E
 
 try:
     from manimgl_myplugin.astro import (Saturn, Mars, Moon, Earth, Venus,
-                                    Jupiter, Uranus, Body, named)
+                                    Jupiter, Uranus, Body, Sun, named,
+                                    CORONA_SHELLS)
     from manimlib import Mobject, VMobject, YELLOW
     from manimlib.mobject.types.dot_cloud import DotCloud
     HAVE_MANIMGL = True
@@ -544,9 +545,12 @@ def test_info_reads_sensibly():
 # ------------------------------------------------- new facts and overlays --
 
 def test_the_new_facts_are_on_every_body():
+    # the Sun orbits nothing and owns no moons, so the two orbit fields
+    # and the moon count are planet-and-moon business only
+    fields = ("mass_kg", "surface_gravity_m_s2", "mean_temp_c")
+    orbit_fields = ("semi_major_axis_m", "orbital_period_days", "moon_count")
     for key, f in BODIES.items():
-        for field in ("mass_kg", "surface_gravity_m_s2", "semi_major_axis_m",
-                      "orbital_period_days", "mean_temp_c", "moon_count"):
+        for field in fields + (orbit_fields if key != "sun" else ()):
             assert getattr(f, field) is not None, (key, field)
     assert abs(BODIES["earth"].mass_kg - 5.9722e24) < 0.01e24
     assert abs(BODIES["earth"].surface_gravity_m_s2 - 9.8) < 0.1
@@ -944,6 +948,63 @@ def test_colour_reaches_the_glyph_fills():
             if type(sm).__name__ == "Text" and sm.has_points():
                 assert not np.allclose(
                     sm.uniforms["fill_rgba"][:3], 1.0, atol=1e-3)
+
+
+# ----------------------------------------------------------- the star --
+
+
+def test_the_suns_row_matches_published_values():
+    sun = BODIES["sun"]
+    assert sun.equatorial_radius_m == 696_340_000
+    assert abs(sun.rotation_period_h - 609.12) < 0.01    # 25.4 days
+    assert abs(sun.axial_tilt_deg - 7.25) < 0.01         # to the ecliptic
+    assert not sun.solid                                  # nothing to stand on
+    assert texture_url(sun.texture).endswith("/2k_sun.jpg")
+
+
+def test_sun_is_a_body_with_six_shells():
+    if _skip():
+        return
+    sun = Sun(radius=1.6)
+    assert isinstance(sun, Body)
+    assert sun.facts.name == "Sun"
+    assert len(sun.corona) == len(CORONA_SHELLS) == 6
+    # the lift first, the widest shell last, at the measured multiples
+    mults = [shell.radius / sun.radius for shell in sun.corona]
+    assert np.allclose(mults, [row[0] for row in CORONA_SHELLS], rtol=1e-12)
+    assert mults == sorted(mults)
+    # the globe is the light, not something lit -- no shading on it
+    assert np.allclose(sun.globe.uniforms["shading"], 0.0)
+
+
+def test_the_corona_is_light_not_paint():
+    if _skip():
+        return
+    for shell in Sun(radius=1.6).corona:
+        assert shell.blend_mode == "add"       # adds to what is behind
+        assert shell.depth_write is False      # leaves the depth buffer alone
+        assert shell.z_index == 1              # above the z-0 world
+    # every shell but the flat lift fades towards its own edge
+    powers = [row[1] for row in CORONA_SHELLS]
+    assert powers[0] is None
+    assert all(p is not None for p in powers[1:])
+
+
+def test_the_corona_is_the_body_not_an_overlay():
+    if _skip():
+        return
+    assert len(Sun(radius=1.6, corona=False).corona) == 0
+    sun = Sun(radius=1.6)
+    sun.marker(23.8, 90.4)
+    sun.shed_overlays()
+    # shedding takes the marker back, never the glow
+    assert len(sun.corona) == 6
+
+
+def test_named_knows_the_sun():
+    if _skip():
+        return
+    assert isinstance(named("sun"), Sun)
 
 
 def main():

@@ -47,6 +47,7 @@ _HELPERS: dict[str, tuple[str, ...]] = {
     ),
     "astro": (
         "Body", "RingBand", "BodyFacts", "BODIES", "named",
+        "Sun", "CORONA_SHELLS",
         "Mercury", "Venus", "Earth", "Moon", "Mars",
         "Jupiter", "Saturn", "Uranus", "Neptune",
     ),

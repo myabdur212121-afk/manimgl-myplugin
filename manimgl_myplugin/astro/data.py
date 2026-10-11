@@ -86,6 +86,14 @@ _NEPTUNE_RINGS = (RingBand(2.15, 2.16, 0.12, "Adams"),)
 
 
 BODIES: dict[str, BodyFacts] = {
+    "sun": BodyFacts("Sun", 696_340_000, 0.0, 7.25, "sun",
+                     solid=False,
+                     note="a star: nothing solid to stand on, and the "
+                          "glow around it is shells of light, not a "
+                          "surface",
+                     rotation_period_h=609.12,
+                     mass_kg=1.9885e30, surface_gravity_m_s2=274,
+                     mean_temp_c=5505),
     "mercury": BodyFacts("Mercury", 2_439_700, 0.0, 0.03, "mercury",
                        rotation_period_h=1407.6,
                        mass_kg=0.33010e24, surface_gravity_m_s2=3.7,

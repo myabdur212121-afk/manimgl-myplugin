@@ -46,6 +46,69 @@ raw table.
 
 ---
 
+## The Sun and its corona
+
+```python
+sun = Sun(radius=1.6)
+self.camera.light_source.move_to(sun.get_center())   # light the others from it
+self.add(sun)
+```
+
+`Sun` is a `Body` like the rest — same radius, quality and resolution
+parameters — with two differences: the globe is shaded flat, because it is
+the light rather than something lit by one, and around it go **six
+concentric shells of light**, the corona.
+
+This is real geometry, not a picture glued to the camera. Each shell is an
+inverse-fresnel sphere — brightest facing the body, fading to nothing at
+its own edge — drawn with **additive blend** and **no depth writing**.
+Because the shells sit in the scene like everything else:
+
+- a planet **in front** of the sun cuts the glow — a transit leaves the
+  light 39% darker at the planet's disc,
+- a planet **behind** it is drawn under the light — the glow lies over
+  it, no black dot (a night-side body reads as a dim patch, a lit one
+  shines through the haze),
+- a planet **behind the disc** is hidden by it, by the ordinary depth test.
+
+The shell opacities are fitted, not chosen: each shell was rendered on its
+own, its response measured, and the six fitted by nnls against a
+limb-to-3.1R falloff (684 → 71); the assembled scene lands on the same
+profile within five percent. The table is `CORONA_SHELLS` in `bodies.py`,
+and `sun.corona` is the group of six if you ever want to reach one.
+
+### The renderer patch
+
+`blend_mode="add"` and `depth_write=False` are read by a **patched
+manimlib** — upstream draws everything with ordinary alpha blend, and a
+tint can only darken a bright background, never add to it. The patch is
+112 lines across two renderer files, kept at
+`manim-handover/patches/manimgl-glow-renderer.patch`:
+
+```bash
+git apply manimgl-glow-renderer.patch    # inside your manim checkout
+```
+
+Without it, everything in this package still builds and runs — the shells
+just draw as flat veils, and a warning says so at construction.
+
+### Parameters
+
+`corona=True` — `False` leaves the star bare. `corona_resolution=(128, 64)`
+is the mesh of each shell. Everything else is `Body`'s own list.
+
+### Limits, said plainly
+
+- Beyond about 2.7 radii the outer tail is a **surface** of light, not a
+  volume: a body passing behind the very outer shell at a grazing angle
+  can look covered where a true corona would let its light pass.
+- The corona adds light around the sun only. It is not scene-wide bloom:
+  bright pixels elsewhere do not spill onto their neighbours.
+- The sun does not light the other bodies by itself — move the scene's
+  light onto it (above), or every planet keeps its default lighting.
+
+---
+
 ## Parameters
 
 ```python

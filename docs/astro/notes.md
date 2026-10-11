@@ -277,8 +277,14 @@ draw until asked.
 | axis, X-ray against honest | 2032 px against 399: the guide shows its buried middle, the honest axis only its two tips |
 | default width 2 (chosen) | 0.680 of the X-ray self at the demo framing — a quarter of the far cage shows; width 6 holds at 0.441 |
 | Earth g cross-check | G·M/R² from the table matches the quoted 9.80 to within 0.02 |
+| `Sun(radius=1.6)` | six shells at 1.019–3.3R, ~1.9 s to build, 6 × 16,384 triangles |
+| corona profile, h=10 | disc 684 → 596 → 534 → 377 → 311 → 234 → 154 → 121 → 71 at 3.1R; full scene within ±5% |
+| transit cut (front) | 403 at the planet's disc against 658 around it — the glow parts, 39% darker |
+| body behind, off the disc | 106–130 under the light against 300–600 in the ring — veiled, no black dot |
+| `Sun()` probe, 480p still | disc 238 decaying to 25 at 3.05R, monotone; a planet over the disc reads 50% of the disc around it; a planet behind the edge gains ~+80 under the light |
+| add order, before vs after | cut 119.1 = 119.1, ring annulus 41.48 = 41.48 — the z-index settles it; frames differ by 0.14% mean at the planet rims |
 
-Tests: `python tests/test_astro.py` — 46 checks, about 40 s (the first run
+Tests: `python tests/test_astro.py` — 60 checks, about 40 s (the first run
 downloads textures).
 
 ---
@@ -322,3 +328,7 @@ downloads textures).
 3. To add a body, add a row to `BODIES` in `data.py` and a line at the
    bottom of `bodies.py`. No new behaviour should be needed; if it is,
    that is worth a second look.
+4. The Sun's corona needs the glow renderer patch on top of manimlib
+   (`manim-handover/patches/manimgl-glow-renderer.patch`) — apply it
+   before judging a glow render; an unpatched renderer draws the shells
+   as flat veils and `Sun()` says so with a warning.

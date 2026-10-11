@@ -18,6 +18,7 @@ tilt, which texture, where the rings start and stop. See ``data.py``.
 from __future__ import annotations
 
 import hashlib
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +27,7 @@ from manimlib.animation.rotation import Rotating
 from manimlib.constants import DEGREES, OUT, RIGHT, TAU, WHITE
 from manimlib.mobject.geometry import Arc, Circle, Line
 from manimlib.mobject.mobject import Group
+from manimlib.mobject.three_dimensions import Sphere
 from manimlib.mobject.types.dot_cloud import DotCloud
 from manimlib.mobject.types.vectorized_mobject import VGroup, VMobject
 
@@ -34,8 +36,9 @@ from ..obj.mobject import OBJMobject
 from ..shapes import revolve
 from .data import BODIES, BodyFacts, RingBand, texture_url
 
-__all__ = ["Body", "RingBand", "Mercury", "Venus", "Earth", "Moon", "Mars",
-           "Jupiter", "Saturn", "Uranus", "Neptune", "named"]
+__all__ = ["Body", "RingBand", "CORONA_SHELLS", "Mercury", "Venus", "Earth",
+           "Moon", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Sun",
+           "named"]
 
 #: ManimGL's own default light position, so a body looks right with no setup.
 DEFAULT_LIGHT = np.array([-10.0, 10.0, 10.0])
@@ -86,6 +89,23 @@ SPECIAL_WIDTH_FACTOR = 1.4
 #: How far out the Solar System Scope ring strip reaches, in planet radii.
 #: The image covers the whole system from the inner D ring to the outer A.
 RING_TEXTURE_SPAN = (1.11, 2.27)
+
+#: The Sun's corona as measured: one flat photosphere lift plus five
+#: inverse-fresnel shells. Each row is (multiple of the body radius,
+#: fresnel exponent -- None for the flat lift, colour of the light,
+#: opacity). The opacities are fitted, not eyeballed: every shell was
+#: rendered on its own, its true response measured, and the six fitted
+#: by nnls against a falloff from the limb (684 at the edge of the disc
+#: down to 71 at 3.1 radii); the assembled scene lands on the same
+#: profile to within five percent. See notes 2.20.
+CORONA_SHELLS = (
+    (1.019, None, (1.000, 0.914, 0.753), 0.420),
+    (1.45, 1.4, (1.000, 0.822, 0.548), 0.231),
+    (1.80, 1.1, (1.000, 0.774, 0.472), 0.149),
+    (2.20, 0.9, (1.000, 0.723, 0.415), 0.111),
+    (2.70, 0.75, (1.000, 0.671, 0.359), 0.120),
+    (3.30, 0.60, (1.000, 0.620, 0.302), 0.052),
+)
 
 
 class Body(Group):
@@ -1443,9 +1463,120 @@ Saturn = _preset("saturn")
 Uranus = _preset("uranus")
 Neptune = _preset("neptune")
 
+
+def _glow_renderer_patched() -> bool:
+    """
+    Does this manimlib know additive blending? The corona asks for it by
+    name (``blend_mode = "add"``); an unpatched manimlib silently draws
+    the shells as ordinary paint, which reads as flat veils rather than
+    light. Better to say so at construction than let a wrong-looking
+    render pass unnoticed.
+    """
+    try:
+        from manimlib.renderer.pipeline import BLENDS
+    except ImportError:
+        return False
+    return "add" in BLENDS
+
+
+class Sun(Body):
+    """
+    The star: an unlit globe wrapped in a corona that is real geometry --
+    six concentric shells of light rather than a picture glued to the
+    camera.
+
+    ::
+
+        sun = Sun(radius=1.6)
+        self.camera.light_source.move_to(sun.get_center())
+        self.add(sun)
+
+    The globe is shaded flat because it *is* the light, not something lit
+    by one. Each shell is inverse-fresnel -- brightest facing the body,
+    fading to nothing at its own edge -- drawn additively and without
+    depth writing, so a planet in front cuts the glow and a planet behind
+    is drawn under the light (measured: a transit leaves the light 39%
+    darker at the planet's disc, and a body behind shows no black dot --
+    the glow lies over it, whatever phase it is in).
+
+    The corona needs the glow renderer patch, kept in
+    ``manim-handover/patches/``. Without it everything still builds and
+    runs; the shells just draw as flat veils, and a warning says so. To
+    light the *other* bodies from the sun, put the scene's light on it
+    (``self.camera.light_source.move_to(sun.get_center())``) -- the
+    corona itself never touches the scene.
+
+    Parameters
+    ----------
+    corona
+        ``False`` leaves the star bare: an unlit, textured globe.
+    corona_resolution
+        ``(segments, rings)`` of each shell mesh.
+    """
+
+    facts = BODIES["sun"]
+
+    def __init__(self, radius: float = 3.0, *, corona: bool = True,
+                 corona_resolution: tuple[int, int] = (128, 64),
+                 **kwargs):
+        super().__init__(radius, **kwargs)
+        # a star lights everything else; nothing lights it. Left at the
+        # default, the far side of the globe would fall into darkness.
+        self.globe.set_shading(0.0, 0.0, 0.0)
+        self.corona = Group()
+        if not corona:
+            return
+        if not _glow_renderer_patched():
+            warnings.warn(
+                "this manimlib has no additive blending, so the corona "
+                "will draw as flat veils; apply the glow renderer patch "
+                "(manim-handover/patches/manimgl-glow-renderer.patch)",
+                stacklevel=2)
+        # construction re-opened for a moment: Body.add() starts
+        # remembering grafts once it is done, and the corona is the body,
+        # not something shed_overlays() should ever take back
+        self._overlays = None
+        self.corona = self._build_corona(corona_resolution)
+        self.add(self.corona)
+        self._overlays = []
+
+    def _build_corona(self, resolution) -> Group:
+        centre = self.globe.get_center()
+        shells = []
+        for mult, power, rgb, opacity in CORONA_SHELLS:
+            shell = Sphere(radius=mult * self.radius, resolution=resolution)
+            shell.move_to(centre)
+            shell.set_shading(0.0, 0.0, 0.0)
+            r_, g_, b_ = (f"{x:.3f}" for x in rgb)
+            if power is None:
+                # the lift: a plain bright film just off the photosphere
+                code = f"color = vec4f(vec3f({r_}, {g_}, {b_}), {opacity});"
+            else:
+                # inverse-fresnel: brightest facing the body, so the aura
+                # decays smoothly outwards instead of ending at a hard
+                # rim -- a plain fresnel shell does the opposite
+                code = (
+                    "let to_cam = normalize(frame.camera_position - point);"
+                    f"let f = pow(abs(dot(normal, to_cam)), {power});"
+                    f"color = vec4f(vec3f({r_}, {g_}, {b_}), {opacity} * f);"
+                )
+            shell.set_color_by_code(code)
+            # light, not paint: add to whatever is behind rather than
+            # tinting it, and leave nothing in the depth buffer --
+            # additive layers would otherwise reject one another's far
+            # sides. Both props are read by the patched renderer only.
+            shell.blend_mode = "add"
+            shell.depth_write = False
+            # above the z-0 world, so the glow lands on planets behind
+            # the sun whatever order the scene added things in (equal
+            # indices draw in no stable order -- see notes 2.13)
+            shell.set_z_index(1)
+            shells.append(shell)
+        return Group(*shells)
+
 _PRESETS = {k: v for k, v in zip(
-    BODIES, [Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus,
-             Neptune])}
+    BODIES, [Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn,
+             Uranus, Neptune])}
 
 
 def named(key: str, **kwargs) -> Body:

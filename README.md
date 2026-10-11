@@ -65,6 +65,11 @@ pip install -e .
 pip install git+https://github.com/3b1b/manim.git     # ManimGL itself
 ```
 
+The Sun's corona additionally needs the two-file glow patch, kept at
+[manim-handover](https://github.com/myabdur212121-afk/manim-handover) under
+`patches/` — `git apply` it inside the manim checkout. Everything else
+runs unpatched.
+
 **ManimGL only — not Manim Community Edition.** The mobject side subclasses
 ManimGL's `Surface` and writes its wgsl shader buffers directly; CE's
 renderer is a different thing, so a port would mean a second backend rather
@@ -92,9 +97,9 @@ manimgl_myplugin/
 ├── shapes/                helper: meshes from formulas
 │   ├── build.py           revolve, extrude, from_surface
 │   └── profiles.py        the small arrays they take
-└── astro/                 helper: planets, moons, rings
+└── astro/                 helper: planets, moons, rings, the Sun
     ├── data.py            the table of measured facts
-    └── bodies.py          Body, the presets, the shadow solving
+    └── bodies.py          Body, the presets, the corona, the shadow solving
 
 docs/
 ├── adding-a-helper.md     the shape a new helper should take
@@ -110,7 +115,7 @@ docs/
     └── notes.md
 
 examples/                  runnable scenes, one folder per helper
-tests/                     obj 21 + shapes 18 + astro 46 = 85 checks
+tests/                     obj 21 + shapes 18 + astro 60 = 99 checks
 ```
 
 ---
